@@ -7,6 +7,8 @@
 // SPDX-License-Identifier: MIT
 //
 
+// コマや座標を文字に変換とその逆
+
 #include "csa.h"
 #include "../core/internal/utils.h"
 #include "../core/squareiterator.h"
