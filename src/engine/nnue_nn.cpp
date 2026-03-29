@@ -16,7 +16,7 @@ namespace NNUE{
 		}
 
 
-		void compute_layert_32x31(
+		void compute_layert_32x1(
 			const __restrict uint8_t* in_value, 
 			uint8_t* out_value, 
 			const int8_t weights[32],
@@ -40,28 +40,8 @@ namespace NNUE{
 			int32_t sum = hsum_epi32(tmp_32);
 
 
-
-			for(int i=0; i < 32; i++){
-				__m256i v_w = _mm256_load_si256(reinterpret_cast<const __m256i*>(weights[i]));
-
-				// v_in（ノード）と v_w（重み）	をかけ合わせてと隣で足す
-				// 8bit -> 16bit
-				__m256i tmp_16 = _mm256_maddubs_epi16(v_in, v_w);
-
-				// すべて1のレジスタとかけて足し合わせることで水平加算の手助け
-				__m256i tmp_32 = __256_madd_epi16(tmp_16, v_ones);
-
-				// 水平加算
-				int32_t sum = hsum_epi32(tmp_32);
-
-				sum += biases[i];
-
-				// スケール　とりあえず 2^6 で割る。
-				sum >>= 6;
-
-				//Clipped ReLU
-				out_value[i] = static_cast<uint8_t>(std::clamp(sum, 0, 127));
-			}
+			//Clipped ReLU
+			out_value = static_cast<uint8_t>(std::clamp(sum, 0, 127));
 		}
 
 		void compute_layert_32x32(
