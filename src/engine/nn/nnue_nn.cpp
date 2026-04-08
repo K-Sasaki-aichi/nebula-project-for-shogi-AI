@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <algorithm>
 
+
 // もっと速くできるがとりあえずこの関数。いずれ直します。
 
 namespace NNUE{

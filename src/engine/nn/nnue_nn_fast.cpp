@@ -39,49 +39,55 @@ namespace NNUE{
 			*out_value = hsum_epi32(tmp_32) + biase;
 		}
 
+		
 		void compute_layert_32x32(
-			const __restrict uint8_t* in_value, 
-			uint8_t* out_value, 
-			const int8_t weights[32][32],
-			const int32_t biases[32]
-		){
-			__m256i v_in = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(in_value));
+            const __restrict uint8_t* in_value, 
+            uint8_t* out_value, 
+            const int8_t weights[32][32],
+            const int32_t biases[32]
+        ){
+            __m256i v_in = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(in_value));
 
-			__m256i v_ones = _mm256_set1_epi16(1);
-			__m256i v_zeros = _mm256_setzero_si256();
-			__m256i v_max = _mm256_set1_epi32(127);
+            __m256i v_ones = _mm256_set1_epi16(1);
+            
+            // 【修正1・2】後半のSSE命令に合わせて __m128i で宣言し、8ビット単位で127をセットする
+            __m128i v_zeros = _mm_setzero_si128();
+            __m128i v_max = _mm_set1_epi8(127); 
 
-			for(int i=0; i < 32; i += 4){
-				__m256i row0 = _mm256_madd_epi16(v_ones, _mm256_maddubs_epi16(v_in, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights[i]))));
-				__m256i row1 = _mm256_madd_epi16(v_ones, _mm256_maddubs_epi16(v_in, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights[i+1]))));
-				__m256i row2 = _mm256_madd_epi16(v_ones, _mm256_maddubs_epi16(v_in, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights[i+2]))));
-				__m256i row3 = _mm256_madd_epi16(v_ones, _mm256_maddubs_epi16(v_in, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights[i+3]))));
+            for(int i=0; i < 32; i += 4){
+                __m256i row0 = _mm256_madd_epi16(v_ones, _mm256_maddubs_epi16(v_in, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights[i]))));
+                __m256i row1 = _mm256_madd_epi16(v_ones, _mm256_maddubs_epi16(v_in, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights[i+1]))));
+                __m256i row2 = _mm256_madd_epi16(v_ones, _mm256_maddubs_epi16(v_in, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights[i+2]))));
+                __m256i row3 = _mm256_madd_epi16(v_ones, _mm256_maddubs_epi16(v_in, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(weights[i+3]))));
 
-				// 水平加算
-				// 半分だけ加算
-				__m256i tmp = _mm256_hadd_epi32(_mm256_hadd_epi32(row0, row1), _mm256_hadd_epi32(row2, row3));
-				
-				// ここでlo+hiで完全に加算
-				__m128i sum_lo = _mm256_castsi256_si128(tmp);
-				__m128i sum_hi = _mm256_extracti128_si256(tmp, 1);
-				__m128i sum_vec = _mm_add_epi32(sum_lo, sum_hi);
+                // 水平加算
+                // 半分だけ加算
+                __m256i tmp = _mm256_hadd_epi32(_mm256_hadd_epi32(row0, row1), _mm256_hadd_epi32(row2, row3));
+                
+                // ここでlo+hiで完全に加算 (256bit -> 128bit の縮小)
+                __m128i sum_lo = _mm256_castsi256_si128(tmp);
+                __m128i sum_hi = _mm256_extracti128_si256(tmp, 1);
+                __m128i sum_vec = _mm_add_epi32(sum_lo, sum_hi);
 
+                // Biaseの加算
+                sum_vec = _mm_add_epi32(sum_vec, _mm_loadu_si128(reinterpret_cast<const __m128i*>(&biases[i])));
 
-				// Biaseの加算
-				sum_vec = _mm_add_epi32(sum_vec, _mm_loadu_si128(reinterpret_cast<const __m128i*>(&biases[i])));
+                // スケール(sum >> 6)
+                // 【修正3】 _mm_ を追加
+                sum_vec = _mm_srai_epi32(sum_vec, 6);
 
-				// スケール(sum >> 6)
-				sum_vec = _srai_epi32(sum_vec, 6);
+                // Cliped ReLU(0-127)
+                // 32 -> 16 -> 8 bit
+                // ※v_zerosが__m128iになったことでエラー解消
+                __m128i res = _mm_packus_epi16(_mm_packs_epi32(sum_vec, v_zeros), v_zeros);
+            
+                // ※v_maxが__m128iかつepi8になったことでエラー解消、正しい比較が可能に
+                res = _mm_min_epu8(res, v_max);
 
-				// Cliped ReLU(0-127)
-				// 32 -> 16 -> 8 bit
-				__m128i res = _mm_packus_epi16(_mm_packs_epi32(sum_vec, v_zeros), v_zeros);
-			
-				res = _mm_min_epu8(res, v_max);
+                *reinterpret_cast<int32_t*>(&out_value[i]) = _mm_cvtsi128_si32(res);
+            }
+        }
 
-				*reinterpret_cast<int32_t*>(&out_value[i]) = _mm_cvtsi128_si32(res);
-			}
-		}
 
 		void compute_layert_512x32(
 	    const __restrict uint8_t* in_value, 
