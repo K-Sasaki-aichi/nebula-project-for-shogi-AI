@@ -94,44 +94,44 @@ namespace NNUE{
 	    uint8_t* out_value, 
 	    const int8_t weights[32][512],
 	    const int32_t biases[32]
-	) {
-	    const __m256i v_ones = _mm256_set1_epi16(1);
+		) {
+			const __m256i v_ones = _mm256_set1_epi16(1);
 
-	    for (int i = 0; i < 32; i += 4) {
-	        __m256i v_sum0 = _mm256_setzero_si256();
-	        __m256i v_sum1 = _mm256_setzero_si256();
-	        __m256i v_sum2 = _mm256_setzero_si256();
-	        __m256i v_sum3 = _mm256_setzero_si256();
+			for (int i = 0; i < 32; i += 4) {
+				__m256i v_sum0 = _mm256_setzero_si256();
+				__m256i v_sum1 = _mm256_setzero_si256();
+				__m256i v_sum2 = _mm256_setzero_si256();
+				__m256i v_sum3 = _mm256_setzero_si256();
 
-	        for (int j = 0; j < 512; j += 32) {
-	            __m256i v_in = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&in_value[j]));
+				for (int j = 0; j < 512; j += 32) {
+					__m256i v_in = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&in_value[j]));
 
-	            // 重みロードと積和演算 (タイポ修正済み)
-	            auto step = [&](const int8_t* w_ptr, __m256i& v_sum) {
-	                __m256i v_w = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w_ptr));
-	                __m256i tmp_16 = _mm256_maddubs_epi16(v_in, v_w);
-	                v_sum = _mm256_add_epi32(v_sum, _mm256_madd_epi16(tmp_16, v_ones));
-	            };
+					// 重みロードと積和演算 (タイポ修正済み)
+					auto step = [&](const int8_t* w_ptr, __m256i& v_sum) {
+						__m256i v_w = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w_ptr));
+						__m256i tmp_16 = _mm256_maddubs_epi16(v_in, v_w);
+						v_sum = _mm256_add_epi32(v_sum, _mm256_madd_epi16(tmp_16, v_ones));
+					};
 
-	            step(&weights[i + 0][j], v_sum0);
-	            step(&weights[i + 1][j], v_sum1);
-	            step(&weights[i + 2][j], v_sum2);
-	            step(&weights[i + 3][j], v_sum3);
-	        }
+					step(&weights[i + 0][j], v_sum0);
+					step(&weights[i + 1][j], v_sum1);
+					step(&weights[i + 2][j], v_sum2);
+					step(&weights[i + 3][j], v_sum3);
+				}
 
-	        // 垂直に足してから最後に水平加算する等の工夫も可能ですが、まずは基本の修正
-	        int32_t sums[4] = {
-	            hsum_epi32(v_sum0) + biases[i + 0],
-	            hsum_epi32(v_sum1) + biases[i + 1],
-	            hsum_epi32(v_sum2) + biases[i + 2],
-	            hsum_epi32(v_sum3) + biases[i + 3]
-	        };
+				// 垂直に足してから最後に水平加算する等の工夫も可能ですが、まずは基本の修正
+				int32_t sums[4] = {
+					hsum_epi32(v_sum0) + biases[i + 0],
+					hsum_epi32(v_sum1) + biases[i + 1],
+					hsum_epi32(v_sum2) + biases[i + 2],
+					hsum_epi32(v_sum3) + biases[i + 3]
+				};
 
-	        for (int k = 0; k < 4; ++k) {
-	            out_value[i + k] = static_cast<uint8_t>(std::clamp(sums[k] >> 6, 0, 127));
-	        }
-	    }
-	}
+				for (int k = 0; k < 4; ++k) {
+					out_value[i + k] = static_cast<uint8_t>(std::clamp(sums[k] >> 6, 0, 127));
+				}
+	    	}
+		}
 
 	} // NN
 } // NNUE
