@@ -133,5 +133,5 @@ namespace NNUE{
 	    	}
 		}
 
-	} // NN
-} // NNUE
+	} // namespace NN
+} // namespace NNUE
