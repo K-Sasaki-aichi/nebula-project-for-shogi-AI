@@ -6,12 +6,12 @@
 #include "../nshogi/src/io/sfen.h"
 #include "../nshogi/src/core/squareiterator.h"
 #include "../nshogi/src/core/types.h"
+#include "StatewithNNUE.h"
 #include <string>
 #include <iostream>
 
 using nshogi::core::Position;
 
-#include <string>
 
 std::string PieceKindtoString(const nshogi::core::PieceKind PK){
     using namespace nshogi::core;
@@ -68,7 +68,7 @@ void print(const Position& Pos) {
     for (auto It = SquareIt.begin(); It != SquareIt.end(); ++It) {
         const Square Sq = *It;
 
-        std::cout << PieceKindtoString(Pos.pieceOn(Sq));      
+        std::cout << nshogi::io::sfen::squareToSfen(Sq);
 
         if((++i % 9) == 0) std::cout << std::endl;
     }
@@ -83,14 +83,18 @@ int main() {
     core::initializer::initializeAll();
 
     // Set up the initial state.
-    auto state = core::StateBuilder::getInitialState();
+    //auto state = core::StateBuilder::getInitialState();
+
+    StatewithNNUE stateWithNNUE;
+
+    auto& state = stateWithNNUE.getState();
 
     // Generate legal moves.
     auto moves = core::MoveGenerator::generateLegalMoves(state);
 
     print(state.getPosition());
 
-    state.doMove(moves[2]);
+    stateWithNNUE.doMove(moves[2]);
 
     print(state.getPosition());
 
@@ -102,7 +106,7 @@ int main() {
     // // Print all moves in sfen format.
     // std::cout << "moves.size(): " << moves.size() << std::endl;
     // for (const auto& move : moves) {
-    //     std::cout << io::sfen::move32ToSfen(move) << std::endl;
+    // std::cout << io::sfen::move32ToSfen(move) << std::endl;
     // }
 
     return 0;
