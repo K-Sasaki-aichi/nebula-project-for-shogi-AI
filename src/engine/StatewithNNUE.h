@@ -35,10 +35,7 @@ public:
     StatewithNNUE(nshogi::core::State&& s)
         : state(std::move(s)) {}
 
-    void doMove(nshogi::core::Move32 move){
-        state.doMove(move);
-        std::cout << "NNUE" << std::endl;
-    }
+    void doMove(nshogi::core::Move32 move);
 
     void undoMove(){
         state.undoMove();
