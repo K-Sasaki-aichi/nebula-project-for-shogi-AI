@@ -82,15 +82,16 @@ constexpr int16_t capPieceIdTable[8] = {
     capGold,
 };
 
-
-
 class StatewithNNUE {
 private:
     nshogi::core::State state;
     // アキュムレータ (256次元 x 2手番)
-    alignas(32) int32_t acc[nshogi::core::NumColors][256];
+    alignas(32) int16_t acc[nshogi::core::NumColors][256];
 
-    Square king_sq[nshogi::core::NumColors] = {nshogi::core::Sq5I, nshogi::core::Sq5A}; 
+    // インデックスを入れておく配列
+    // こうしておくことでCPU内部レベルでは早くなる
+    // レジスタ枯渇やキャッシュ効率を高めるため
+    int32_t indices[nshogi::core::NumColors][64];
 
 public:
     StatewithNNUE()
@@ -111,20 +112,30 @@ public:
         return SqIdTable[Sq];
     }
 
-    // 相手のコマならisOpponent = 1.
-    // 729 = 81 * 9
-    template<bool isOpponent>
-    inline int32_t getSqIndex(const PieceTypeKind type, const Square Sq) {
+
+    // C は今見ているコマの色
+    template<nshogi::core::Color SideToMove, nshogi::core::Color C>
+    constexpr int32_t getSqIndex(const PieceTypeKind type, const Square Sq) {
+        int sqId = SqIdTable[Sq];
+
+        // 後手なら反転
+        if constexpr (SideToMove == nshogi::core::White) {
+            sqId = 80 - sqId;
+        }
+        
+        // 729 = 9*81
+        constexpr int offset = (SideToMove == C) ? 0 : 729;
+
         return pieceIdtable[type] * 81
-            + SqIdTable[Sq]
-            + (isOpponent * 729);
+            + sqId
+            + offset;
     }
 
-    template <bool isOpponent>
+    template<bool isOpponent>
     inline constexpr int32_t getCapturedIndex(const PieceTypeKind type, const int count){
         return capPieceIdTable[type] 
             + count 
-            + (isOpponent * 45);
+            + (isOpponent * 45)
     }
 
     // アキュムレータの初期化
@@ -148,7 +159,10 @@ public:
     void setAcc(const int32_t index);
 
     template <nshogi::core::Color C>
-    void calFullAcc();
+    void refresh_acc();
+
+    template <nshogi::core::Color C>
+    void extract_features(int& num_feature);
 
     inline nshogi::core::State& getState(){return state;}
 

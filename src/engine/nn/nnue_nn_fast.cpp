@@ -1,6 +1,7 @@
 #include <immintrin.h>
 #include <cstdint>
 #include <algorithm>
+#include "../model/weights.h"
 
 // もっと速くできるがとりあえずこの関数。いずれ直します。
 
@@ -15,11 +16,11 @@ namespace NNUE{
 		}
 
 
-		void compute_layert_32x1(
+		void compute_layer_32x1(
 			const __restrict uint8_t* in_value, 
 			int* out_value, 
 			const int8_t weights[32],
-			const int32_t biase
+			const int32_t bias
 		){
 			__m256i v_in = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(in_value));
 			
@@ -36,11 +37,11 @@ namespace NNUE{
 			__m256i tmp_32 = _mm256_madd_epi16(tmp_16, v_ones);
 
 			// 水平加算
-			*out_value = hsum_epi32(tmp_32) + biase;
+			*out_value = hsum_epi32(tmp_32) + bias;
 		}
 
 		
-		void compute_layert_32x32(
+		void compute_layer_32x32(
             const __restrict uint8_t* in_value, 
             uint8_t* out_value, 
             const int8_t weights[32][32],
@@ -73,7 +74,6 @@ namespace NNUE{
                 sum_vec = _mm_add_epi32(sum_vec, _mm_loadu_si128(reinterpret_cast<const __m128i*>(&biases[i])));
 
                 // スケール(sum >> 6)
-                // 【修正3】 _mm_ を追加
                 sum_vec = _mm_srai_epi32(sum_vec, 6);
 
                 // Cliped ReLU(0-127)
@@ -89,7 +89,7 @@ namespace NNUE{
         }
 
 
-		void compute_layert_512x32(
+		void compute_layer_512x32(
 	    const __restrict uint8_t* in_value, 
 	    uint8_t* out_value, 
 	    const int8_t weights[32][512],
@@ -119,7 +119,6 @@ namespace NNUE{
 					step(&weights[i + 3][j], v_sum3);
 				}
 
-				// 垂直に足してから最後に水平加算する等の工夫も可能ですが、まずは基本の修正
 				int32_t sums[4] = {
 					hsum_epi32(v_sum0) + biases[i + 0],
 					hsum_epi32(v_sum1) + biases[i + 1],
@@ -131,6 +130,10 @@ namespace NNUE{
 					out_value[i + k] = static_cast<uint8_t>(std::clamp(sums[k] >> 6, 0, 127));
 				}
 	    	}
+		}
+
+		int32_t evaluation(){
+			
 		}
 
 	} // namespace NN
