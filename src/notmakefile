@@ -6,7 +6,7 @@ TARGET = test
 SRC = $(wildcard engine/*.cpp)
 
 all:
-	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+	$(CXX) $(SRC) $(CXXFLAGS) $(LDFLAGS) -o $(TARGET)
 
 clean:
 	rm -f $(TARGET)
