@@ -16,16 +16,6 @@
 // StatewithNNUE(nshogi::core::State&& s)
 //     : state(std::move(s)) {}
 
-// アキュムレータの初期化
-void StatewithNNUE::initAcc(){
-
-}
-
-// indexを受け取りアキュムレータを計算する関数
-void StatewithNNUE::setAcc(const int32_t index){
-
-}
-
 
 template <nshogi::core::Color C>
 void StatewithNNUE::calFullAcc(){

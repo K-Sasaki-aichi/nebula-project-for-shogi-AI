@@ -4,6 +4,8 @@
 #include "../nshogi/src/core/position.h"
 #include "../nshogi/src/core/statebuilder.h"
 #include "../nshogi/src/core/movegenerator.h"
+#include "../model/weights.h"
+#include "../nshogi/src/core/internal/stateadapter.h"
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
@@ -13,6 +15,7 @@ using nshogi::core::PieceTypeKind;
 using nshogi::core::Square;
 
 
+namespace nnue {
 enum PieceId : uint8_t {
     Pawn = 0,
     Lance = 1,
@@ -110,14 +113,14 @@ public:
 
     // 相手のコマならisOpponent = 1.
     // 729 = 81 * 9
-    template<int isOpponent>
+    template<bool isOpponent>
     inline int32_t getSqIndex(const PieceTypeKind type, const Square Sq) {
         return pieceIdtable[type] * 81
             + SqIdTable[Sq]
             + (isOpponent * 729);
     }
 
-    template <int isOpponent>
+    template <bool isOpponent>
     inline constexpr int32_t getCapturedIndex(const PieceTypeKind type, const int count){
         return capPieceIdTable[type] 
             + count 
@@ -150,3 +153,5 @@ public:
     inline nshogi::core::State& getState(){return state;}
 
 };
+
+}//nnue

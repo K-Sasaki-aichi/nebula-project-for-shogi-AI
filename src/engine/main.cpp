@@ -6,6 +6,7 @@
 #include "../nshogi/src/io/sfen.h"
 #include "../nshogi/src/core/squareiterator.h"
 #include "../nshogi/src/core/types.h"
+#include "../nshogi/src/core/internal/stateadapter.h"
 #include "StatewithNNUE.h"
 #include <string>
 #include <iostream>
@@ -77,10 +78,11 @@ void print(const Position& Pos) {
 }
 
 int main() {
-    using namespace nshogi;
+    using namespace nshogi::core;
+    using namespace nnue;
 
     // Initialize the library.
-    core::initializer::initializeAll();
+    initializer::initializeAll();
 
     // Set up the initial state.
     //auto state = core::StateBuilder::getInitialState();
@@ -90,7 +92,17 @@ int main() {
     auto& state = stateWithNNUE.getState();
 
     // Generate legal moves.
-    auto moves = core::MoveGenerator::generateLegalMoves(state);
+    auto moves = MoveGenerator::generateLegalMoves(state);
+
+    internal::ImmutableStateAdapter adapter(state);
+    internal::bitboard::Bitboard black_pawns = adapter->getBitboard<Black, PTK_Pawn>();
+    // Bitboardが空になる（isZero() が true になる）までループ
+    while (!black_pawns.isZero()) {
+        // popOne()は、一番下位の駒の位置を取得しつつ、その駒をBitboardから「消去」します
+        Square pawn_sq = black_pawns.popOne();
+        std::cout << nshogi::io::sfen::squareToSfen(pawn_sq) << std::endl;
+    }
+
 
     print(state.getPosition());
 
