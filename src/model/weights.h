@@ -16,7 +16,7 @@ namespace weight {
     struct alignas(ALIGN) W_Acc {
         // 先手後手のアキュムレータがあるため2倍する.
         int32_t bias[Numlayer];
-        int8_t weight[2*NumAcc][Numlayer];
+        int8_t weight[Numlayer][2*NumAcc];
     };
 
     struct alignas(ALIGN) W_layert {
@@ -26,7 +26,7 @@ namespace weight {
 
     struct alignas(ALIGN) W_output {
         int32_t bias;
-        int8_t weight[Numlayer][1];
+        int8_t weight[Numlayer];
     };
 
     extern W_input w_input;

@@ -11,12 +11,6 @@
 #include <immintrin.h>
 
 
-// StatewithNNUE()
-//     : state(nshogi::core::StateBuilder::getInitialState()) {}
-
-// StatewithNNUE(nshogi::core::State&& s)
-//     : state(std::move(s)) {}
-
 namespace nnue {
 
 template <nshogi::core::Color C>
