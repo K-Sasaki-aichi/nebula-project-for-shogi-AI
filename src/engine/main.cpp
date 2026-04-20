@@ -103,18 +103,34 @@ int main() {
         printf("success\n");
     }
 
+
+    int32_t score;
     std::cout << "side to move: " << (int)state.getSideToMove() << std::endl;
+
+    print(state.getPosition());
 
     stateWithNNUE.refresh_acc<Black>();
     stateWithNNUE.refresh_acc<White>();
-
-    int32_t score = nnue::eval<Black>(stateWithNNUE);
+    score = nnue::eval<Black>(stateWithNNUE);
 
     std::cout << "score = " << score << std::endl;
 
     stateWithNNUE.doMove(moves[2]);
 
+    print(state.getPosition());
+
+    stateWithNNUE.refresh_acc<Black>();
+    stateWithNNUE.refresh_acc<White>();
+    score = nnue::eval<White>(stateWithNNUE);
+
+    std::cout << "score = " << score << std::endl;
+
     state.undoMove();
+
+    stateWithNNUE.refresh_acc<Black>();
+    stateWithNNUE.refresh_acc<White>();
+    score = nnue::eval<Black>(stateWithNNUE);
+    std::cout << "score = " << score << std::endl;
 
 
 

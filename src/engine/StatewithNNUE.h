@@ -174,6 +174,8 @@ public:
 
         internal::bitboard::Bitboard bitboard;
         int8_t count;
+
+        #pragma unroll
         for(int pt = PTK_Pawn; pt < NumPieceType; pt++){
             PieceTypeKind type = static_cast<PieceTypeKind>(pt);
 

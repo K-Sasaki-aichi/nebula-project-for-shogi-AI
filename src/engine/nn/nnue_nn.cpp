@@ -8,29 +8,36 @@
 
 namespace nnue{
 	namespace NN{
-		void accToInput(const int16_t acc[2][256], uint8_t out[512]){
+
+		void accToInput(const int16_t acc0[256], const int16_t acc1[256], uint8_t out[512]){
 			const __m256i zeros = _mm256_setzero_si256();
 
-			// アキュムレータの２次元配列をフラットに
-			const int16_t* acc_flat = reinterpret_cast<const int16_t*>(acc);
-
 			#pragma unroll
-			for (int i = 0; i < 512; i += 32) { 
-				__m256i v0 = _mm256_load_si256((const __m256i*)&acc_flat[i]);
-				__m256i v1 = _mm256_load_si256((const __m256i*)&acc_flat[i + 16]);
+			for (int i = 0; i < 256; i += 32) { 
+				__m256i v0 = _mm256_loadu_si256((const __m256i*)&acc0[i]);
+				__m256i v1 = _mm256_loadu_si256((const __m256i*)&acc0[i + 16]);
+
+				__m256i v2 = _mm256_loadu_si256((const __m256i*)&acc1[i]);
+				__m256i v3 = _mm256_loadu_si256((const __m256i*)&acc1[i + 16]);
 
 				// ０以上にクリップ
 				v0 = _mm256_max_epi16(v0, zeros);
 				v1 = _mm256_max_epi16(v1, zeros);
 
+				v2 = _mm256_max_epi16(v2, zeros);
+				v3 = _mm256_max_epi16(v3, zeros);
+
 				// 8bitにパック
 				// この時127以上は127にされる
-				__m256i packed = _mm256_packs_epi16(v0, v1);
+				__m256i packed0 = _mm256_packs_epi16(v0, v1);
+				__m256i packed1 = _mm256_packs_epi16(v2, v3);
 
 				// 順序の並び替えとメモリストア
-				_mm256_store_si256((__m256i*)&out[i],
-									_mm256_permute4x64_epi64(packed, _MM_SHUFFLE(3, 1, 2, 0)));
-
+				_mm256_storeu_si256((__m256i*)&out[i],
+									_mm256_permute4x64_epi64(packed0, _MM_SHUFFLE(3, 1, 2, 0)));
+				
+				_mm256_storeu_si256((__m256i*)&out[i+256],
+									_mm256_permute4x64_epi64(packed1, _MM_SHUFFLE(3, 1, 2, 0)));
 			}
 		}
 
@@ -148,24 +155,6 @@ namespace nnue{
 					out_value[i + k] = static_cast<uint8_t>(std::clamp(sums[k] >> 6, 0, 127));
 				}
 	    	}
-		}
-
-		int32_t calNN(const int16_t acc[2][256]){
-			using namespace weight;
-
-			alignas(32) uint8_t clipped_acc[512];
-			alignas(32) uint8_t h1_out[32];
-			alignas(32) uint8_t h2_out[32];
-			int32_t score = 0;
-
-			// アキュムレータを512個の特徴量に変換（clipedReLU）
-			accToInput(acc, clipped_acc);
-			
-			compute_layer_512x32(clipped_acc, h1_out, w_acc.weight, w_acc.bias);
-			compute_layer_32x32(h1_out, h2_out, w_layer.weight, w_layer.bias);
-			compute_layer_32x1(h2_out, score, w_output.weight, w_output.bias);
-
-			return score / 16;
 		}
 
 	} // namespace NN
