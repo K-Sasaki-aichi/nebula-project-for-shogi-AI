@@ -14,7 +14,6 @@
 namespace nnue {
 void StatewithNNUE::doMove(nshogi::core::Move32 move){
     state.doMove(move);
-    std::cout << "NNUE" << std::endl;
 }
 
 void StatewithNNUE::undoMove(){

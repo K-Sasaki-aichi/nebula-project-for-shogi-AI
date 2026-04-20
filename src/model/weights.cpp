@@ -29,6 +29,24 @@ namespace weight {
         std::string desc(desc_len, '\0');
         ifs.read(&desc[0], desc_len);
 
+        // // ==========================================
+        // // 2. 特徴変換層 (HalfKP) の読み込み
+        // // ==========================================
+        // uint32_t ft_hash;
+        // ifs.read(reinterpret_cast<char*>(&ft_hash), sizeof(ft_hash));
+
+        // ifs.read(reinterpret_cast<char*>(w_input.bias), sizeof(w_input.bias));
+
+        // // 【修正】ファイルは [256][125388]、構造体はSIMD向けに [125388][256] です。
+        // // スタックオーバーフローを防ぐため、1つの出力(125388要素=約250KB)ずつヒープに読み込み転置します。
+        // std::vector<int16_t> ft_buf(NumFeatures);
+        // for (int i = 0; i < NumAcc; ++i) { // 0 〜 255
+        //     ifs.read(reinterpret_cast<char*>(ft_buf.data()), NumFeatures * sizeof(int16_t));
+        //     for (int j = 0; j < NumFeatures; ++j) { // 0 〜 125387
+        //         w_input.weight[j][i] = ft_buf[j];
+        //     }
+        // }
+
         // ==========================================
         // 2. 特徴変換層 (HalfKP) の読み込み
         // ==========================================
@@ -37,15 +55,9 @@ namespace weight {
 
         ifs.read(reinterpret_cast<char*>(w_input.bias), sizeof(w_input.bias));
 
-        // 【修正】ファイルは [256][125388]、構造体はSIMD向けに [125388][256] です。
-        // スタックオーバーフローを防ぐため、1つの出力(125388要素=約250KB)ずつヒープに読み込み転置します。
-        std::vector<int16_t> ft_buf(NumFeatures);
-        for (int i = 0; i < NumAcc; ++i) { // 0 〜 255
-            ifs.read(reinterpret_cast<char*>(ft_buf.data()), NumFeatures * sizeof(int16_t));
-            for (int j = 0; j < NumFeatures; ++j) { // 0 〜 125387
-                w_input.weight[j][i] = ft_buf[j];
-            }
-        }
+        // ファイル上でも [125388][256] (Input x Output) の順で格納されているため、
+        // 転置は不要。構造体へ一撃ロード（Zero-Copy I/O）でそのまま読み込みます。
+        ifs.read(reinterpret_cast<char*>(w_input.weight), sizeof(w_input.weight));
 
         // ==========================================
         // 3. ネットワーク層 (AffineTransform) の読み込み

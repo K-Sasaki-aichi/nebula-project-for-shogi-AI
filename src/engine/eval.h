@@ -5,6 +5,6 @@
 namespace nnue{
     template <nshogi::core::Color C>
     inline int32_t eval(StatewithNNUE& statewithNNUE){
-        return nnue::NN::calNN<C>(statewithNNUE.getAcc());
+        return (nnue::NN::calNN<C>(statewithNNUE.getAcc()) >> 4);
     }
 }

@@ -17,18 +17,18 @@ using nshogi::core::Square;
 
 
 namespace nnue {
-enum PieceId : uint8_t {
-    Pawn = 0,
-    Lance = 1,
-    Knight = 2,
-    Silver = 3,
-    Gold = 4,
-    Bishop = 5,
-    Rook = 6,
-    ProBishop = 7,
-    ProRook = 8,
 
-    Error = 255,
+enum PieceId : uint16_t {
+    Error = 0,
+    Pawn = 90,
+    Lance = 252,
+    Knight = 414,
+    Silver = 576,
+    Gold = 738,
+    Bishop = 900,
+    ProBishop = 1062,
+    Rook = 1224,
+    ProRook = 1386,
 };
 
 constexpr PieceId pieceIdtable[nshogi::core::NumPieceType] = {
@@ -49,6 +49,51 @@ constexpr PieceId pieceIdtable[nshogi::core::NumPieceType] = {
     ProRook
 };
 
+enum standPiecedId : int8_t{
+    NULL_Id = -1,
+    capPawn = 0,
+    capLance = 38,
+    capKnight = 48,
+    capSilver = 58,
+    capGold = 68,
+    capBishop = 78,
+    capRook = 84,
+};
+
+// enum class otherStandPiecedId : int8_t{
+//     NULL_Id = -1,
+//     capPawn = 19,
+//     capLance = 43,
+//     capKnight = 53,
+//     capSilver = 63,
+//     capGold = 73,
+//     capBishop = 81,
+//     capRook = 87,
+// };
+
+constexpr int8_t ownTable[8] = {
+    NULL_Id,
+    capPawn,
+    capLance,
+    capKnight,
+    capSilver,
+    capBishop,
+    capRook,
+    capGold
+};
+
+constexpr int8_t otherTable[8] = {
+    NULL_Id,
+    capPawn+19,
+    capLance+5,
+    capKnight+5,
+    capSilver+5,
+    capBishop+3,
+    capRook+3,
+    capGold+5
+};
+
+
 constexpr int8_t SqIdTable[81] = {
      8,  7,  6,  5,  4,  3,  2,  1,  0, // 元の0〜8 (Sq1I〜Sq1A) を NNUEの Sq1I〜Sq1A にマッピング
     17, 16, 15, 14, 13, 12, 11, 10,  9,
@@ -59,28 +104,6 @@ constexpr int8_t SqIdTable[81] = {
     62, 61, 60, 59, 58, 57, 56, 55, 54,
     71, 70, 69, 68, 67, 66, 65, 64, 63,
     80, 79, 78, 77, 76, 75, 74, 73, 72  // 元の72〜80 (Sq9I〜Sq9A) を NNUEの Sq9I〜Sq9A にマッピング
-};
-
-enum capturedPiecedId : int16_t{
-    NULL_Id = 0,
-    capPawn = 1458,
-    capLance = 1477,
-    capKnight = 1482,
-    capSilver = 1487,
-    capGold = 1492,
-    capBishop = 1497,
-    capRook = 1500,
-};
-
-constexpr int16_t capPieceIdTable[8] = {
-    NULL_Id,
-    capPawn, 
-    capLance,
-    capKnight,
-    capSilver,
-    capBishop,
-    capRook,
-    capGold,
 };
 
 class StatewithNNUE {
@@ -109,38 +132,27 @@ public:
         return pieceIdtable[type];
     }
 
-    template<nshogi::core::Color C>
+    template<nshogi::core::Color Us>
     inline constexpr int8_t SquareToSqId(const Square Sq){
-        if constexpr(C == nshogi::core::White){
+        if constexpr(Us== nshogi::core::White){
             return 80 - SqIdTable[Sq];
         }
         return SqIdTable[Sq];
     }
 
-
-    // C は今見ているコマの色
-    template<nshogi::core::Color SideToMove, nshogi::core::Color C>
+    template<nshogi::core::Color Us, nshogi::core::Color C>
     constexpr int32_t getSqIndex(const PieceTypeKind type, const Square Sq) {
-        int sqId = SqIdTable[Sq];
-
-        // 後手なら反転
-        if constexpr (SideToMove == nshogi::core::White) {
-            sqId = 80 - sqId;
-        }
+        int sqId = SquareToSqId<Us>(Sq);
         
-        // 729 = 9*81
-        constexpr int offset = (SideToMove == C) ? 0 : 729;
+        // 味方なら 0、敵なら 1
+        constexpr int enemyOffset = (Us == C) ? 0 : 81;
 
-        return pieceIdtable[type] * 81
-            + sqId
-            + offset;
+        return pieceIdtable[type] + sqId + enemyOffset;
     }
 
-    template<bool isOpponent>
+    template<bool isOwn>
     inline constexpr int32_t getCapturedIndex(const PieceTypeKind type, const int count){
-        return capPieceIdTable[type] 
-            + count 
-            + (isOpponent * 45);
+        return (isOwn ? ownTable[type] : otherTable[type]) + count;
     }
 
     // アキュムレータの初期化
@@ -177,6 +189,10 @@ public:
 
         #pragma unroll
         for(int pt = PTK_Pawn; pt < NumPieceType; pt++){
+            if (pt == PTK_King) {
+                continue;
+            }
+
             PieceTypeKind type = static_cast<PieceTypeKind>(pt);
 
             bitboard = adapter->getBitboard<Black>(type);
@@ -191,11 +207,18 @@ public:
                 indices[C][num_feature++] = KingSqId + getSqIndex<C, White>(type, sq);
             }
 
-            count = adapter->getStandCount<Black>(type);
-            indices[C][num_feature++] = KingSqId + getCapturedIndex<C==Black>(type, count);
-        
-            count = adapter->getStandCount<White>(type);
-            indices[C][num_feature++] = KingSqId + getCapturedIndex<C==White>(type, count);
+            if(pt < PTK_King){
+                count = adapter->getStandCount<Black>(type);
+                for (int i = 1; i <= count; ++i) { // 1枚目からcount枚目まで全て足す
+                    indices[C][num_feature++] = KingSqId + getCapturedIndex<C==Black>(type, i);
+                }
+
+                // 敵の持ち駒
+                count = adapter->getStandCount<White>(type);
+                for (int i = 1; i <= count; ++i) {
+                    indices[C][num_feature++] = KingSqId + getCapturedIndex<C==White>(type, i);
+                }
+            }
         }
     }
 
@@ -213,8 +236,8 @@ public:
             const int16_t* ptr_weight = weight::w_input.weight[indices[C][i]];
 
             for(int j = 0; j < weight::NumAcc; j += 16){
-                __m256i a = _mm256_load_si256(reinterpret_cast<const __m256i*>(&acc[C][j]));
-                __m256i w = _mm256_load_si256(reinterpret_cast<const __m256i*>(&ptr_weight[j]));
+                __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&acc[C][j]));
+                __m256i w = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&ptr_weight[j]));
 
                 _mm256_store_si256(reinterpret_cast<__m256i*>(&acc[C][j]), _mm256_add_epi16(a, w));
             }

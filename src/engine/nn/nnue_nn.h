@@ -58,7 +58,7 @@ namespace nnue
 			compute_layer_32x32(h1_out, h2_out, w_layer.weight, w_layer.bias);
 			compute_layer_32x1(h2_out, score, w_output.weight, w_output.bias);
 
-			return score / 16;
+			return score;
 		}
     
     } // namespace NN

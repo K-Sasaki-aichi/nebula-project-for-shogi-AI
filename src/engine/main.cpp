@@ -71,13 +71,14 @@ void print(const Position& Pos) {
     for (auto It = SquareIt.begin(); It != SquareIt.end(); ++It) {
         const Square Sq = *It;
 
-        std::cout << nshogi::io::sfen::squareToSfen(Sq);
+        std::cout << PieceKindtoString(Pos.pieceOn(Sq));      
 
         if((++i % 9) == 0) std::cout << std::endl;
     }
 
     std::cout << std::endl << std::endl;
 }
+
 
 int main() {
     using namespace nshogi::core;
@@ -100,36 +101,45 @@ int main() {
         printf("読み込み失敗");
         return 1;
     } else {
-        printf("success\n");
+        printf("load success\n");
     }
 
 
     int32_t score;
     std::cout << "side to move: " << (int)state.getSideToMove() << std::endl;
 
-    print(state.getPosition());
-
     stateWithNNUE.refresh_acc<Black>();
     stateWithNNUE.refresh_acc<White>();
+
+    print(state.getPosition());
+
     score = nnue::eval<Black>(stateWithNNUE);
 
     std::cout << "score = " << score << std::endl;
 
+
+
+
+    stateWithNNUE.doMove(moves[1]);
+
+    print(state.getPosition());
+
+    stateWithNNUE.refresh_acc<Black>();
+    stateWithNNUE.refresh_acc<White>();
+    score = -nnue::eval<White>(stateWithNNUE);
+
+    std::cout << "score = " << score << std::endl;
+
+
+
+    state.undoMove();
     stateWithNNUE.doMove(moves[2]);
 
     print(state.getPosition());
 
     stateWithNNUE.refresh_acc<Black>();
     stateWithNNUE.refresh_acc<White>();
-    score = nnue::eval<White>(stateWithNNUE);
-
-    std::cout << "score = " << score << std::endl;
-
-    state.undoMove();
-
-    stateWithNNUE.refresh_acc<Black>();
-    stateWithNNUE.refresh_acc<White>();
-    score = nnue::eval<Black>(stateWithNNUE);
+    score = -nnue::eval<White>(stateWithNNUE);
     std::cout << "score = " << score << std::endl;
 
 
