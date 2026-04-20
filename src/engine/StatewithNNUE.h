@@ -10,6 +10,7 @@
 #include <string.h>
 #include <iostream>
 #include <cstring>
+#include <immintrin.h>
 
 using nshogi::core::PieceTypeKind;
 using nshogi::core::Square;
@@ -108,7 +109,11 @@ public:
         return pieceIdtable[type];
     }
 
+    template<nshogi::core::Color C>
     inline constexpr int8_t SquareToSqId(const Square Sq){
+        if constexpr(C == nshogi::core::White){
+            return 80 - SqIdTable[Sq];
+        }
         return SqIdTable[Sq];
     }
 
@@ -135,7 +140,7 @@ public:
     inline constexpr int32_t getCapturedIndex(const PieceTypeKind type, const int count){
         return capPieceIdTable[type] 
             + count 
-            + (isOpponent * 45)
+            + (isOpponent * 45);
     }
 
     // アキュムレータの初期化
@@ -156,15 +161,72 @@ public:
     //     memset(acc[C], 0, sizeof(acc[C]));
     // }
 
+    template <nshogi::core::Color C>
+    void extract_features(int& num_feature){
+        using namespace nshogi::core;
+        using namespace nnue;
+
+        //const Position& Pos = state.getPosition();
+        internal::ImmutableStateAdapter adapter(state);
+        Square king_sq = adapter->getKingSquare<C>();
+        
+        const int KingSqId = SquareToSqId<C>(king_sq) * 1548;
+
+        internal::bitboard::Bitboard bitboard;
+        int8_t count;
+        for(int pt = PTK_Pawn; pt < NumPieceType; pt++){
+            PieceTypeKind type = static_cast<PieceTypeKind>(pt);
+
+            bitboard = adapter->getBitboard<Black>(type);
+            while (!bitboard.isZero()) {
+                Square sq = bitboard.popOne();
+                indices[C][num_feature++] = KingSqId + getSqIndex<C, Black>(type, sq);
+            }
+
+            bitboard = adapter->getBitboard<White>(type);
+            while (!bitboard.isZero()) {
+                Square sq = bitboard.popOne();
+                indices[C][num_feature++] = KingSqId + getSqIndex<C, White>(type, sq);
+            }
+
+            count = adapter->getStandCount<Black>(type);
+            indices[C][num_feature++] = KingSqId + getCapturedIndex<C==Black>(type, count);
+        
+            count = adapter->getStandCount<White>(type);
+            indices[C][num_feature++] = KingSqId + getCapturedIndex<C==White>(type, count);
+        }
+    }
+
+    template <nshogi::core::Color C>
+    void refresh_acc(){
+        using namespace nshogi::core;
+        using namespace nnue;
+
+        initAcc(C);
+
+        int num_feature = 0;
+        extract_features<C>(num_feature);
+
+        for(int i = 0; i < num_feature; i++){
+            const int16_t* ptr_weight = weight::w_input.weight[indices[C][i]];
+
+            for(int j = 0; j < weight::NumAcc; j += 16){
+                __m256i a = _mm256_load_si256(reinterpret_cast<const __m256i*>(&acc[C][j]));
+                __m256i w = _mm256_load_si256(reinterpret_cast<const __m256i*>(&ptr_weight[j]));
+
+                _mm256_store_si256(reinterpret_cast<__m256i*>(&acc[C][j]), _mm256_add_epi16(a, w));
+            }
+        }
+    }
+
+
     void setAcc(const int32_t index);
 
-    template <nshogi::core::Color C>
-    void refresh_acc();
-
-    template <nshogi::core::Color C>
-    void extract_features(int& num_feature);
-
     inline nshogi::core::State& getState(){return state;}
+
+    inline auto& getAcc() const { return acc; }
+
+    nshogi::core::Color getSideToMove() const;
 
 };
 

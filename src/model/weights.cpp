@@ -12,7 +12,7 @@ namespace weight {
     W_output w_output;
 
     bool load() {
-        std::ifstream ifs("nn.bin", std::ios::binary);
+        std::ifstream ifs("model/nn.bin", std::ios::binary);
         if (!ifs) {
             std::cerr << "エラー: nn.bin を開けませんでした。" << std::endl;
             return false;

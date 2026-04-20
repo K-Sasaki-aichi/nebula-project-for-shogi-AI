@@ -8,6 +8,8 @@
 #include "../nshogi/src/core/types.h"
 #include "../nshogi/src/core/internal/stateadapter.h"
 #include "StatewithNNUE.h"
+#include "eval.h"
+#include "../model/weights.h"
 #include <string>
 #include <iostream>
 
@@ -94,25 +96,26 @@ int main() {
     // Generate legal moves.
     auto moves = MoveGenerator::generateLegalMoves(state);
 
-    internal::ImmutableStateAdapter adapter(state);
-    internal::bitboard::Bitboard black_pawns = adapter->getBitboard<Black, PTK_Pawn>();
-    // Bitboardが空になる（isZero() が true になる）までループ
-    while (!black_pawns.isZero()) {
-        // popOne()は、一番下位の駒の位置を取得しつつ、その駒をBitboardから「消去」します
-        Square pawn_sq = black_pawns.popOne();
-        std::cout << nshogi::io::sfen::squareToSfen(pawn_sq) << std::endl;
+    if(!weight::load()){
+        printf("読み込み失敗");
+        return 1;
+    } else {
+        printf("success\n");
     }
 
+    std::cout << "side to move: " << (int)state.getSideToMove() << std::endl;
 
-    print(state.getPosition());
+    stateWithNNUE.refresh_acc<Black>();
+    stateWithNNUE.refresh_acc<White>();
+
+    int32_t score = nnue::eval<Black>(stateWithNNUE);
+
+    std::cout << "score = " << score << std::endl;
 
     stateWithNNUE.doMove(moves[2]);
 
-    print(state.getPosition());
-
     state.undoMove();
 
-    print(state.getPosition());
 
 
     // // Print all moves in sfen format.

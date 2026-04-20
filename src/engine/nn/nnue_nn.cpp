@@ -35,7 +35,7 @@ namespace nnue{
 		}
 
 		void compute_layer_32x1(
-			const __restrict uint8_t* in_value, 
+			const uint8_t* __restrict in_value, 
 			int32_t& out_value, 
 			const int8_t weights[32],
 			const int32_t bias
@@ -60,7 +60,7 @@ namespace nnue{
 
 		
 		void compute_layer_32x32(
-            const __restrict uint8_t* in_value, 
+            const uint8_t* __restrict in_value, 
             uint8_t* out_value, 
             const int8_t weights[32][32],
             const int32_t biases[32]
@@ -108,7 +108,7 @@ namespace nnue{
 
 
 		void compute_layer_512x32(
-			const __restrict uint8_t* in_value, 
+			const uint8_t* __restrict in_value, 
 			uint8_t* out_value, 
 			const int8_t weights[32][512],
 			const int32_t biases[32]
@@ -150,7 +150,7 @@ namespace nnue{
 	    	}
 		}
 
-		int32_t evaluation(const int16_t acc[2][256]){
+		int32_t calNN(const int16_t acc[2][256]){
 			using namespace weight;
 
 			alignas(32) uint8_t clipped_acc[512];
@@ -165,7 +165,7 @@ namespace nnue{
 			compute_layer_32x32(h1_out, h2_out, w_layer.weight, w_layer.bias);
 			compute_layer_32x1(h2_out, score, w_output.weight, w_output.bias);
 
-			return score;
+			return score / 16;
 		}
 
 	} // namespace NN
