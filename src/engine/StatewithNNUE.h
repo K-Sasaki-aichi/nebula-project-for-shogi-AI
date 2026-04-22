@@ -6,6 +6,7 @@
 #include "../nshogi/src/core/movegenerator.h"
 #include "../model/weights.h"
 #include "../nshogi/src/core/internal/stateadapter.h"
+#include "nn/nnue_nn.h"
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
@@ -16,6 +17,7 @@ using nshogi::core::PieceTypeKind;
 using nshogi::core::Square;
 using nshogi::core::Color;
 
+constexpr int MAX_PLY = 512;
 
 namespace nnue {
 
@@ -51,7 +53,7 @@ constexpr PieceId pieceIdtable[nshogi::core::NumPieceType] = {
 };
 
 enum standPiecedId : int8_t{
-    NULL_Id = -1,
+    NULL_Id = 100,
     capPawn = 0,
     capLance = 38,
     capKnight = 48,
@@ -154,30 +156,68 @@ struct DirtyPiece
     uint16_t addIndex[2];
 };
 
+struct alignas(64) StateInfo{
+    alignas(32) int16_t acc[nshogi::core::NumColors][256];
+
+    uint64_t zobristKey;
+};
 
 class StatewithNNUE {
 private:
     nshogi::core::State state;
-    // アキュムレータ (256次元 x 2手番)
-    alignas(32) int16_t acc[nshogi::core::NumColors][256];
 
     // インデックスを入れておく配列
     // こうしておくことでCPU内部レベルでは早くなる
     // レジスタ枯渇やキャッシュ効率を高めるため
     int32_t indices[nshogi::core::NumColors][64];
 
-    Square king_sq[nshogi::core::NumColors];
+    std::vector<StateInfo> stateStack;
+    StateInfo* st;
 
 public:
+    void init(){
+        stateStack.resize(256);
+        st = &stateStack[0];
+
+        refresh_acc<nshogi::core::White>();
+        refresh_acc<nshogi::core::Black>();
+    }
+
     StatewithNNUE()
         : state(nshogi::core::StateBuilder::getInitialState()) {}
 
     StatewithNNUE(nshogi::core::State&& s)
         : state(std::move(s)) {}
 
-    void doMove(nshogi::core::Move32 move);
+    template <nshogi::core::Color Us>
+    void doMove(const nshogi::core::Move32& M){
+        using namespace nshogi::core;
+        
+        StateInfo* prev_info = st;
+        st++;
 
-    void undoMove();
+        *st = *prev_info;
+
+        state.doMove(M);
+
+        if(M.pieceType() != PTK_King){
+            updateIncremental<Us>(M);
+            return;
+        }
+
+        refresh_acc<Us>();
+        PieceTypeKind capturedType = M.capturePieceType();
+        if(capturedType != PTK_Empty){
+            updateIncrementalCaptureOnly<Us>(M, capturedType);
+        }
+
+        return;
+    }
+
+    void undoMove(){
+        st--;
+        state.undoMove();
+    }
 
     inline constexpr PieceId PieceTypeKindToPieceId(const PieceTypeKind type){
         return pieceIdtable[type];
@@ -223,12 +263,12 @@ public:
     // Usは盤面を見ている手番、Cは今見ているコマの色
     template<Color Us, Color C>
     inline constexpr int32_t getIndex(const PieceTypeKind type, const Square Sq, const int count, const bool isStand) {
-        int sqId = SquareToSqId<Us>(Sq);
+        const int sqId = SquareToSqId<Us>(Sq);
 
-        int base = typeIdtable[Us != C][NumPieceType * isStand + type];
+        const int base = typeIdtable[Us != C][nshogi::core::NumPieceType * isStand + type];
 
-        int mask = -static_cast<int>(isStand);
-        int add  = (sqId & ~mask) | (count & mask);
+        const int mask = -static_cast<int>(isStand);
+        const int add  = (sqId & ~mask) | (count & mask);
 
         // 味方なら 0、敵なら 81(盤面の升の数だけずらす)
         constexpr int enemyOffset = (Us == C) ? 0 : 81;
@@ -239,10 +279,12 @@ public:
     // アキュムレータの初期化
     // biasで初期化
     inline void initAcc(){
+        auto& acc = st->acc;
         std::memcpy(acc[nshogi::core::Black], weight::w_input.bias, sizeof(acc[nshogi::core::Black]));
         std::memcpy(acc[nshogi::core::White], weight::w_input.bias, sizeof(acc[nshogi::core::White]));
     }
     inline void initAcc(Color C){
+        auto& acc = st->acc;
         std::memcpy(acc[C], weight::w_input.bias, sizeof(acc[C]));
     }
 
@@ -300,6 +342,8 @@ public:
         using namespace nshogi::core;
         using namespace nnue;
 
+        auto& acc = st->acc;
+
         initAcc(C);
 
         int num_feature = 0;
@@ -326,72 +370,22 @@ public:
             _mm256_store_si256(reinterpret_cast<__m256i*>(&acc[C][j]), a0);
             _mm256_store_si256(reinterpret_cast<__m256i*>(&acc[C][j + 16]), a1);
         }
-
-        // for(int i = 0; i < num_feature; i++){
-        //     const int16_t* ptr_weight = weight::w_input.weight[indices[C][i]];
-
-        //     for(int j = 0; j < weight::NumAcc; j += 16){
-        //         __m256i a = _mm256_load_si256(reinterpret_cast<const __m256i*>(&acc[C][j]));
-        //         __m256i w = _mm256_load_si256(reinterpret_cast<const __m256i*>(&ptr_weight[j]));
-
-        //         _mm256_store_si256(reinterpret_cast<__m256i*>(&acc[C][j]), _mm256_add_epi16(a, w));
-        //     }
-        // }
     }
 
 
-    template<Color C>
-    void add_acc(const int index) {
-        const int16_t* __restrict ptr_weight = weight::w_input.weight[index];
-        int16_t* __restrict a_ptr = acc[C];
-
-        // 2回分のループ展開: 1回のイテレーションで32要素 (512ビット) を処理
-        for(int j = 0; j < weight::NumAcc; j += 32) {
-            // 最初の16要素をロード
-            __m256i a0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a_ptr + j));
-            __m256i w0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_weight + j));
-            
-            // 最初のデータがロードされている間に、次の16要素のロードを開始
-            __m256i a1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a_ptr + j + 16));
-            __m256i w1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_weight + j + 16));
-
-            // 加算とストア
-            _mm256_storeu_si256(reinterpret_cast<__m256i*>(a_ptr + j), _mm256_add_epi16(a0, w0));
-            _mm256_storeu_si256(reinterpret_cast<__m256i*>(a_ptr + j + 16), _mm256_add_epi16(a1, w1));
-        }
-    }
-
-    template<Color C>
-    void sub_acc(const int index) {
-        const int16_t* __restrict ptr_weight = weight::w_input.weight[index];
-        int16_t* __restrict a_ptr = acc[C];
-
-        // 2回分のループ展開: 1回のイテレーションで32要素 (512ビット) を処理
-        for(int j = 0; j < weight::NumAcc; j += 32) {
-            // 最初の16要素をロード
-            __m256i a0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a_ptr + j));
-            __m256i w0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_weight + j));
-            
-            // 最初のデータがロードされている間に、次の16要素のロードを開始
-            __m256i a1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a_ptr + j + 16));
-            __m256i w1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_weight + j + 16));
-
-            // 加算とストア
-            _mm256_storeu_si256(reinterpret_cast<__m256i*>(a_ptr + j), _mm256_sub_epi16(a0, w0));
-            _mm256_storeu_si256(reinterpret_cast<__m256i*>(a_ptr + j + 16), _mm256_sub_epi16(a1, w1));
-        }
-    }
-
-
+    // moveの後に行う
     template <Color Us>
     void updateIncremental(const nshogi::core::Move32& M){
         using namespace nshogi::core;
+
+        auto& acc = st->acc;
 
         internal::ImmutableStateAdapter adapter(state);
         constexpr Color Oppo = static_cast<Color>(Us ^ 1);
         const int ownKingSqId = SquareToSqId<Us>(adapter->getKingSquare<Us>()) * 1548;
         const int oppoKingSqId = SquareToSqId<Oppo>(adapter->getKingSquare<Oppo>()) * 1548;
 
+        const Square sq_zero = static_cast<Square>(0);
 
         struct DirtyPiece ownDirty;
         struct DirtyPiece oppoDirty;
@@ -401,7 +395,7 @@ public:
         const bool isDrop = M.drop();
         const Square sq_from = M.from();
         const Square sq_to = M.to();
-        const int count = adapter->getStandCount<Us>(type);
+        const int count = adapter->getStandCount<Us>(type) + 1;
 
         int num = 0;
 
@@ -423,9 +417,9 @@ public:
         oppoDirty.subIndex[num] = oppoKingSqId + getIndex<Oppo, static_cast<Color>(Oppo)>(capturedType, sq_to, 0, false);
         
         capturedType = rePromote(capturedType);
-        const int capturedCount = adapter->getStandCount<Us>(capturedType) + 1;
-        ownDirty.addIndex[num] = ownKingSqId + getIndex<Us, Us>(capturedType, 0, capturedCount, true);
-        oppoDirty.addIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(capturedType, 0, capturedCount, true);
+        const int capturedCount = adapter->getStandCount<Us>(capturedType);
+        ownDirty.addIndex[num] = ownKingSqId + getIndex<Us, Us>(capturedType, sq_zero, capturedCount, true);
+        oppoDirty.addIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(capturedType, sq_zero, capturedCount, true);
         
         num += (capturedType == PTK_Empty) ? 0 : 1;
 
@@ -435,10 +429,10 @@ public:
         int16_t* __restrict a_ptr_oppo = acc[Oppo];
         for(int i = 0; i < weight::NumAcc; i += 32) {
             // アキュムレータをロード.
-            __m256i a0_own = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a_ptr_own + i));
-            __m256i a1_own = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a_ptr_own + i + 16));
-            __m256i a0_oppo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a_ptr_oppo + i));
-            __m256i a1_oppo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a_ptr_oppo + i + 16));
+            __m256i a0_own = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr_own + i));
+            __m256i a1_own = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr_own + i + 16));
+            __m256i a0_oppo = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr_oppo + i));
+            __m256i a1_oppo = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr_oppo + i + 16));
         
             for(int j = 0; j < num; j++){
                 // 重みのロード
@@ -449,15 +443,15 @@ public:
                 const int16_t* ptr_add_weight_oppo = weight::w_input.weight[oppoDirty.addIndex[j]];
 
 
-                __m256i w0_sub_own = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_sub_weight_own + i));
-                __m256i w1_sub_own = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_sub_weight_own + i + 16));
-                __m256i w0_add_own = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_add_weight_own + i));
-                __m256i w1_add_own = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_add_weight_own + i + 16));
+                __m256i w0_sub_own = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_sub_weight_own + i));
+                __m256i w1_sub_own = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_sub_weight_own + i + 16));
+                __m256i w0_add_own = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_add_weight_own + i));
+                __m256i w1_add_own = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_add_weight_own + i + 16));
 
-                __m256i w0_sub_oppo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_sub_weight_oppo + i));
-                __m256i w1_sub_oppo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_sub_weight_oppo + i + 16));
-                __m256i w0_add_oppo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_add_weight_oppo + i));
-                __m256i w1_add_oppo = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ptr_add_weight_oppo + i + 16));
+                __m256i w0_sub_oppo = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_sub_weight_oppo + i));
+                __m256i w1_sub_oppo = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_sub_weight_oppo + i + 16));
+                __m256i w0_add_oppo = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_add_weight_oppo + i));
+                __m256i w1_add_oppo = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_add_weight_oppo + i + 16));
 
 
                 a0_own = _mm256_sub_epi16(a0_own, w0_sub_own);
@@ -478,32 +472,59 @@ public:
             _mm256_store_si256(reinterpret_cast<__m256i*>(&acc[Oppo][i]), a0_oppo);
             _mm256_store_si256(reinterpret_cast<__m256i*>(&acc[Oppo][i + 16]), a1_oppo);
         }
-
-        // // 差分更新を行う.
-        // for(int i = 0; i < num; i++){
-        //     sub_acc<Us>(ownDirty.subIndex[i]);
-        //     sub_acc<static_cast<Color>(Us^1)>(oppoDirty.subIndex[i]);
-
-        //     add_acc<Us>(ownDirty.addIndex[i]);
-        //     add_acc<static_cast<Color>(Us^1)>(oppoDirty.addIndex[i]);
-        // }
+    
     }
 
-    // template <nshogi::core::Color Us>
-    // void updateAcc(const nshogi::core::Move32& M){
-    //     using namespace nshogi::core;
+    template <Color Us>
+    void updateIncrementalCaptureOnly(const nshogi::core::Move32& M, PieceTypeKind capturedType){
+        auto& acc = st->acc;
+
+        const Square sq_zero = static_cast<Square>(0);
+
+        nshogi::core::internal::ImmutableStateAdapter adapter(state);
+        constexpr Color Oppo = static_cast<Color>(Us ^ 1);
+        const int oppoKingSqId = SquareToSqId<Oppo>(adapter->getKingSquare<Oppo>()) * 1548;
+
+        const Square sq_to = M.to();
+        int sub_index = oppoKingSqId + getIndex<Oppo, Oppo>(capturedType, sq_to, 0, false);
+
+        capturedType = rePromote(capturedType);
+        const int capturedCount = adapter->getStandCount<Us>(capturedType);
+        int add_index = oppoKingSqId + getIndex<Oppo, Us>(capturedType, sq_zero, capturedCount, true);
+
+        int16_t* __restrict a_ptr = acc[Oppo];
+        const int16_t* ptr_sub_weight = weight::w_input.weight[sub_index];
+        const int16_t* ptr_add_weight = weight::w_input.weight[add_index];
+        for(int i = 0; i < weight::NumAcc; i += 32) {
+            __m256i a0 = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr + i));
+            __m256i a1 = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr + i + 16));
+
+            __m256i w0_sub = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_sub_weight + i));
+            __m256i w1_sub = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_sub_weight + i + 16));
+            
+            __m256i w0_add = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_add_weight + i));
+            __m256i w1_add = _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr_add_weight + i + 16));
         
-    //     if(M.pieceType() != PTK_King){
-    //         updateIncremental<Us>(M);
-    //         return;
-    //     }
-    // }
+            a0 = _mm256_sub_epi16(a0, w0_sub);
+            a1 = _mm256_sub_epi16(a1, w1_sub);
+            a0 = _mm256_add_epi16(a0, w0_add);
+            a1 = _mm256_add_epi16(a1, w1_add);
+
+            _mm256_store_si256(reinterpret_cast<__m256i*>(&acc[Oppo][i]), a0);
+            _mm256_store_si256(reinterpret_cast<__m256i*>(&acc[Oppo][i + 16]), a1);
+        }
+    }
+
+    template <nshogi::core::Color C>
+    inline int32_t eval(StatewithNNUE& statewithNNUE){
+        return (nnue::NN::calNN<C>(st->acc) >> 4);
+    }
+
+    const auto& getAcc(){ return st->acc; }
 
     void setAcc(const int32_t index);
 
     inline nshogi::core::State& getState(){return state;}
-
-    inline auto& getAcc() const { return acc; }
 
     nshogi::core::Color getSideToMove() const;
 

@@ -75,8 +75,6 @@ void print(const Position& Pos) {
 
         if((++i % 9) == 0) std::cout << std::endl;
     }
-
-    std::cout << std::endl << std::endl;
 }
 
 
@@ -106,40 +104,27 @@ int main() {
 
 
     int32_t score;
-    std::cout << "side to move: " << (int)state.getSideToMove() << std::endl;
-
-    stateWithNNUE.refresh_acc<Black>();
-    stateWithNNUE.refresh_acc<White>();
 
     print(state.getPosition());
 
-    score = nnue::eval<Black>(stateWithNNUE);
+    score = nnue::eval::eval<Black>(stateWithNNUE);
 
     std::cout << "score = " << score << std::endl;
 
-
-
-
-    stateWithNNUE.doMove(moves[1]);
+    stateWithNNUE.doMove<Black>(moves[1]);
 
     print(state.getPosition());
 
-    stateWithNNUE.refresh_acc<Black>();
-    stateWithNNUE.refresh_acc<White>();
-    score = -nnue::eval<White>(stateWithNNUE);
+    score = -nnue::eval::eval<White>(stateWithNNUE);
 
     std::cout << "score = " << score << std::endl;
 
-
-
-    state.undoMove();
-    stateWithNNUE.doMove(moves[2]);
+    stateWithNNUE.undoMove();
+    stateWithNNUE.doMove<Black>(moves[2]);
 
     print(state.getPosition());
 
-    stateWithNNUE.refresh_acc<Black>();
-    stateWithNNUE.refresh_acc<White>();
-    score = -nnue::eval<White>(stateWithNNUE);
+    score = -nnue::eval::eval<White>(stateWithNNUE);
     std::cout << "score = " << score << std::endl;
 
 

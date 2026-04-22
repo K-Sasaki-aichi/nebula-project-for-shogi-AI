@@ -12,14 +12,6 @@
 
 
 namespace nnue {
-void StatewithNNUE::doMove(nshogi::core::Move32 move){
-    state.doMove(move);
-}
-
-void StatewithNNUE::undoMove(){
-    state.undoMove();
-}
-
 
 nshogi::core::Color StatewithNNUE::getSideToMove() const { return state.getSideToMove(); }
 
