@@ -111,9 +111,9 @@ constexpr uint16_t typeIdtable[2][nshogi::core::NumPieceType+8] = {
 
     {    // 盤面のコマ用
     Error,     // 使わない
-    Pawn+81, Lance+81, Knight, Silver, Bishop, Rook, Gold,
+    Pawn+81, Lance+81, Knight+81, Silver+81, Bishop+81, Rook+81, Gold+81,
     Error,    
-    Gold, Gold, Gold, Gold, ProBishop, ProRook,
+    Gold+81, Gold+81, Gold+81, Gold+81, ProBishop+81, ProRook+81,
 
     // 持ち駒用
     NULL_Id, 
@@ -152,8 +152,8 @@ constexpr int8_t SqIdTable[81] = {
 struct DirtyPiece
 {
     int dirty_num = 0;
-    uint16_t subIndex[2];
-    uint16_t addIndex[2];
+    uint32_t subIndex[2];
+    uint32_t addIndex[2];
 };
 
 struct alignas(64) StateInfo{
@@ -169,7 +169,7 @@ private:
     // インデックスを入れておく配列
     // こうしておくことでCPU内部レベルでは早くなる
     // レジスタ枯渇やキャッシュ効率を高めるため
-    int32_t indices[nshogi::core::NumColors][64];
+    int32_t indices[nshogi::core::NumColors][256];
 
     std::vector<StateInfo> stateStack;
     StateInfo* st;
@@ -195,23 +195,23 @@ public:
         
         StateInfo* prev_info = st;
         st++;
-
         *st = *prev_info;
 
+        // ★ まず何があっても盤面を動かす（状態を最新にする）
         state.doMove(M);
 
         if(M.pieceType() != PTK_King){
+            // 玉以外なら、動いた後の盤面を使って差分更新
             updateIncremental<Us>(M);
             return;
         }
 
+        // 玉が動いた場合
         refresh_acc<Us>();
         PieceTypeKind capturedType = M.capturePieceType();
         if(capturedType != PTK_Empty){
             updateIncrementalCaptureOnly<Us>(M, capturedType);
         }
-
-        return;
     }
 
     void undoMove(){
@@ -259,8 +259,8 @@ public:
         return (isOwn ? ownTable[type] : otherTable[type]) + count;
     }
 
-    // 自分の持ち駒、あるいは盤面のインデックス
-    // Usは盤面を見ている手番、Cは今見ているコマの色
+    //自分の持ち駒、あるいは盤面のインデックス
+    //Usは盤面を見ている手番、Cは今見ているコマの色
     template<Color Us, Color C>
     inline constexpr int32_t getIndex(const PieceTypeKind type, const Square Sq, const int count, const bool isStand) {
         const int sqId = SquareToSqId<Us>(Sq);
@@ -270,11 +270,16 @@ public:
         const int mask = -static_cast<int>(isStand);
         const int add  = (sqId & ~mask) | (count & mask);
 
-        // 味方なら 0、敵なら 81(盤面の升の数だけずらす)
-        constexpr int enemyOffset = (Us == C) ? 0 : 81;
-
-        return base + add + enemyOffset;
+        return base + add;
     }
+    // template<Color Us, Color C>
+    // inline constexpr int32_t getIndex(const PieceTypeKind type, const Square Sq, const int count, const bool isStand) {
+    //     if (isStand) {
+    //         return getCapturedIndex<Us == C>(type, count);
+    //     } else {
+    //         return getSqIndex<Us, C>(type, Sq);
+    //     }
+    // }
 
     // アキュムレータの初期化
     // biasで初期化
@@ -406,8 +411,9 @@ public:
         oppoDirty.subIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(type, sq_from, count, isDrop);
 
         const PieceTypeKind next_type = M.promote() ? promote(type) : type;
-        ownDirty.addIndex[num++] = ownKingSqId + getIndex<Us, Us>(next_type, sq_to, 0, false);
-        oppoDirty.addIndex[num++] = oppoKingSqId + getIndex<Oppo, Us>(next_type, sq_to, 0, false);
+        ownDirty.addIndex[num] = ownKingSqId + getIndex<Us, Us>(next_type, sq_to, 0, false);
+        oppoDirty.addIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(next_type, sq_to, 0, false);
+        num++;
 
         /* 取られたコマの差分のインデックスを保存 */
         /* 取られたコマが無ければdirty_numを足さない */
@@ -423,8 +429,56 @@ public:
         
         num += (capturedType == PTK_Empty) ? 0 : 1;
 
+        // using namespace nshogi::core;
+        // auto& acc = st->acc;
 
-        // 上で計算したインデックスをもとに差分更新を行う
+        // internal::ImmutableStateAdapter adapter(state);
+        // constexpr Color Oppo = static_cast<Color>(Us ^ 1);
+        // const int ownKingSqId = SquareToSqId<Us>(adapter->getKingSquare<Us>()) * 1548;
+        // const int oppoKingSqId = SquareToSqId<Oppo>(adapter->getKingSquare<Oppo>()) * 1548;
+
+        // const Square sq_zero = static_cast<Square>(0);
+
+        // struct DirtyPiece ownDirty;
+        // struct DirtyPiece oppoDirty;
+        // int num = 0;
+
+        // PieceTypeKind type = M.pieceType();
+        // const bool isDrop = M.drop();
+        // const Square sq_from = M.from();
+        // const Square sq_to = M.to();
+
+        // // doMove後なので、打った場合は枚数が減っている。+1して元の枚数に戻す。
+        // // 盤面の移動なら count は使われないので 0 でOK。
+        // const int count_sub = isDrop ? (adapter->getStandCount<Us>(type) + 1) : 0;
+
+        // /* --- 1. 動かした前のコマを引く --- */
+        // ownDirty.subIndex[num] = ownKingSqId + getIndex<Us, Us>(type, sq_from, count_sub, isDrop);
+        // oppoDirty.subIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(type, sq_from, count_sub, isDrop);
+
+        // /* --- 2. 動かした後のコマを足す --- */
+        // const PieceTypeKind next_type = M.promote() ? promote(type) : type;
+        // ownDirty.addIndex[num] = ownKingSqId + getIndex<Us, Us>(next_type, sq_to, 0, false);
+        // oppoDirty.addIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(next_type, sq_to, 0, false);
+        
+        // num++; // ここで必ず 1 回だけインクリメント！
+
+        // /* --- 3. 取られたコマの処理 --- */
+        // PieceTypeKind capturedType = M.capturePieceType();
+        // if (capturedType != PTK_Empty) {
+        //     // 盤面から消える敵駒を引く
+        //     ownDirty.subIndex[num] = ownKingSqId + getIndex<Us, Oppo>(capturedType, sq_to, 0, false);
+        //     oppoDirty.subIndex[num] = oppoKingSqId + getIndex<Oppo, Oppo>(capturedType, sq_to, 0, false);
+            
+        //     // 持ち駒に加わる（doMove後なので今の枚数をそのまま使う）
+        //     PieceTypeKind standType = rePromote(capturedType);
+        //     const int capturedCount = adapter->getStandCount<Us>(standType);
+        //     ownDirty.addIndex[num] = ownKingSqId + getIndex<Us, Us>(standType, sq_zero, capturedCount, true);
+        //     oppoDirty.addIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(standType, sq_zero, capturedCount, true);
+            
+        //     num++; // 取った場合のみインクリメント (num は 2 になる)
+        // }
+
         int16_t* __restrict a_ptr_own = acc[Us];
         int16_t* __restrict a_ptr_oppo = acc[Oppo];
         for(int i = 0; i < weight::NumAcc; i += 32) {

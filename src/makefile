@@ -4,7 +4,7 @@ CXXFLAGS = -std=c++2b -I./nshogi/src -mavx2 -O3
 
 LDFLAGS = -L./nshogi/build/release_clang++/lib -lnshogi_static
 
-TARGET = nn_test2
+TARGET = nn_test3
 
 # SRCの指定。 engine/*.cpp だけでなく engine/nn/ などのサブディレクトリも含める。
 # もしこれでも足りなければ、手動で path/to/file.cpp を並べてください。

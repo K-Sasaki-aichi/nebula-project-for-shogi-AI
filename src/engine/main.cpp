@@ -82,58 +82,80 @@ int main() {
     using namespace nshogi::core;
     using namespace nnue;
 
-    // Initialize the library.
     initializer::initializeAll();
-
-    // Set up the initial state.
-    //auto state = core::StateBuilder::getInitialState();
-
     StatewithNNUE stateWithNNUE;
-
     auto& state = stateWithNNUE.getState();
-
-    // Generate legal moves.
     auto moves = MoveGenerator::generateLegalMoves(state);
 
     if(!weight::load()){
-        printf("読み込み失敗");
+        std::cout << "読み込み失敗" << std::endl;
         return 1;
     } else {
-        printf("load success\n");
+        std::cout << "load success\n" << std::endl;
     }
 
-
-    int32_t score;
-
-    print(state.getPosition());
-
-    score = nnue::eval::eval<Black>(stateWithNNUE);
-
-    std::cout << "score = " << score << std::endl;
-
+    // ==========================================
+    // 1. 差分更新 (Incremental) で計算
+    // ==========================================
+    std::cout << "Incremental test" << std::endl;
+    stateWithNNUE.init();
     stateWithNNUE.doMove<Black>(moves[1]);
-
     print(state.getPosition());
 
-    score = -nnue::eval::eval<White>(stateWithNNUE);
+    // 両方の視点から評価値を取得
+    int32_t inc_score_black = nnue::eval::eval<Black>(stateWithNNUE);
+    int32_t inc_score_white = nnue::eval::eval<White>(stateWithNNUE);
+    std::cout << "Black Eval: " << inc_score_black << std::endl;
+    std::cout << "White Eval: " << inc_score_white << std::endl;
 
-    std::cout << "score = " << score << std::endl;
+    // メモリ上のアキュムレータの状態をコピーして保存しておく
+    int16_t saved_acc_black[256];
+    int16_t saved_acc_white[256];
+    std::memcpy(saved_acc_black, stateWithNNUE.getAcc()[Black], sizeof(saved_acc_black));
+    std::memcpy(saved_acc_white, stateWithNNUE.getAcc()[White], sizeof(saved_acc_white));
 
     stateWithNNUE.undoMove();
-    stateWithNNUE.doMove<Black>(moves[2]);
+    std::cout << "--------------------------------\n" << std::endl;
 
+    // ==========================================
+    // 2. 全計算 (Full Refresh) で計算
+    // ==========================================
+    std::cout << "full Refresh test" << std::endl;
+    stateWithNNUE.init();
+    state.doMove(moves[1]); // stateの盤面だけ進める
+    
+    // アキュムレータを1から再構築
+    stateWithNNUE.refresh_acc<Black>();
+    stateWithNNUE.refresh_acc<White>();
     print(state.getPosition());
 
-    score = -nnue::eval::eval<White>(stateWithNNUE);
-    std::cout << "score = " << score << std::endl;
+    // 両方の視点から評価値を取得
+    int32_t full_score_black = nnue::eval::eval<Black>(stateWithNNUE);
+    int32_t full_score_white = nnue::eval::eval<White>(stateWithNNUE);
+    std::cout << "Black Eval: " << full_score_black << std::endl;
+    std::cout << "White Eval: " << full_score_white << std::endl;
 
+    std::cout << "--------------------------------\n" << std::endl;
 
+    // ==========================================
+    // 3. アキュムレータの完全一致検証
+    // ==========================================
+    std::cout << "result" << std::endl;
+    
+    bool isBlackMatch = (std::memcmp(saved_acc_black, stateWithNNUE.getAcc()[Black], sizeof(saved_acc_black)) == 0);
+    bool isWhiteMatch = (std::memcmp(saved_acc_white, stateWithNNUE.getAcc()[White], sizeof(saved_acc_white)) == 0);
 
-    // // Print all moves in sfen format.
-    // std::cout << "moves.size(): " << moves.size() << std::endl;
-    // for (const auto& move : moves) {
-    // std::cout << io::sfen::move32ToSfen(move) << std::endl;
-    // }
+    if (isBlackMatch) {
+        std::cout << "[OK] Black: match" << std::endl;
+    } else {
+        std::cout << "[NG] Black: not-match" << std::endl;
+    }
+
+    if (isWhiteMatch) {
+        std::cout << "[OK] White: match" << std::endl;
+    } else {
+        std::cout << "[NG] White: not-match" << std::endl;
+    }
 
     return 0;
 }
