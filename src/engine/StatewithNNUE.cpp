@@ -20,6 +20,7 @@ void StatewithNNUE::undoMove(){
     state.undoMove();
 }
 
+
 nshogi::core::Color StatewithNNUE::getSideToMove() const { return state.getSideToMove(); }
 
 }
