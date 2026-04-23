@@ -272,14 +272,6 @@ public:
 
         return base + add;
     }
-    // template<Color Us, Color C>
-    // inline constexpr int32_t getIndex(const PieceTypeKind type, const Square Sq, const int count, const bool isStand) {
-    //     if (isStand) {
-    //         return getCapturedIndex<Us == C>(type, count);
-    //     } else {
-    //         return getSqIndex<Us, C>(type, Sq);
-    //     }
-    // }
 
     // アキュムレータの初期化
     // biasで初期化
@@ -428,56 +420,6 @@ public:
         oppoDirty.addIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(capturedType, sq_zero, capturedCount, true);
         
         num += (capturedType == PTK_Empty) ? 0 : 1;
-
-        // using namespace nshogi::core;
-        // auto& acc = st->acc;
-
-        // internal::ImmutableStateAdapter adapter(state);
-        // constexpr Color Oppo = static_cast<Color>(Us ^ 1);
-        // const int ownKingSqId = SquareToSqId<Us>(adapter->getKingSquare<Us>()) * 1548;
-        // const int oppoKingSqId = SquareToSqId<Oppo>(adapter->getKingSquare<Oppo>()) * 1548;
-
-        // const Square sq_zero = static_cast<Square>(0);
-
-        // struct DirtyPiece ownDirty;
-        // struct DirtyPiece oppoDirty;
-        // int num = 0;
-
-        // PieceTypeKind type = M.pieceType();
-        // const bool isDrop = M.drop();
-        // const Square sq_from = M.from();
-        // const Square sq_to = M.to();
-
-        // // doMove後なので、打った場合は枚数が減っている。+1して元の枚数に戻す。
-        // // 盤面の移動なら count は使われないので 0 でOK。
-        // const int count_sub = isDrop ? (adapter->getStandCount<Us>(type) + 1) : 0;
-
-        // /* --- 1. 動かした前のコマを引く --- */
-        // ownDirty.subIndex[num] = ownKingSqId + getIndex<Us, Us>(type, sq_from, count_sub, isDrop);
-        // oppoDirty.subIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(type, sq_from, count_sub, isDrop);
-
-        // /* --- 2. 動かした後のコマを足す --- */
-        // const PieceTypeKind next_type = M.promote() ? promote(type) : type;
-        // ownDirty.addIndex[num] = ownKingSqId + getIndex<Us, Us>(next_type, sq_to, 0, false);
-        // oppoDirty.addIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(next_type, sq_to, 0, false);
-        
-        // num++; // ここで必ず 1 回だけインクリメント！
-
-        // /* --- 3. 取られたコマの処理 --- */
-        // PieceTypeKind capturedType = M.capturePieceType();
-        // if (capturedType != PTK_Empty) {
-        //     // 盤面から消える敵駒を引く
-        //     ownDirty.subIndex[num] = ownKingSqId + getIndex<Us, Oppo>(capturedType, sq_to, 0, false);
-        //     oppoDirty.subIndex[num] = oppoKingSqId + getIndex<Oppo, Oppo>(capturedType, sq_to, 0, false);
-            
-        //     // 持ち駒に加わる（doMove後なので今の枚数をそのまま使う）
-        //     PieceTypeKind standType = rePromote(capturedType);
-        //     const int capturedCount = adapter->getStandCount<Us>(standType);
-        //     ownDirty.addIndex[num] = ownKingSqId + getIndex<Us, Us>(standType, sq_zero, capturedCount, true);
-        //     oppoDirty.addIndex[num] = oppoKingSqId + getIndex<Oppo, Us>(standType, sq_zero, capturedCount, true);
-            
-        //     num++; // 取った場合のみインクリメント (num は 2 になる)
-        // }
 
         int16_t* __restrict a_ptr_own = acc[Us];
         int16_t* __restrict a_ptr_oppo = acc[Oppo];

@@ -83,28 +83,55 @@ int main() {
     using namespace nnue;
 
     initializer::initializeAll();
-    StatewithNNUE stateWithNNUE;
+    
+    std::string customSfen = "lnsgkgsnl/1r5b1/ppppppppp/7K1/9/9/PPPPPPP1P/1B5R1/LNSG1GSNL b P 1";
+
+    StatewithNNUE stateWithNNUE(std::move(nshogi::io::sfen::StateBuilder::newState(customSfen)));
     auto& state = stateWithNNUE.getState();
     auto moves = MoveGenerator::generateLegalMoves(state);
 
     if(!weight::load()){
-        std::cout << "読み込み失敗" << std::endl;
+        std::cout << "load faild" << std::endl;
         return 1;
     } else {
         std::cout << "load success\n" << std::endl;
     }
+    int moveCount = moves.size();
+    std::cout << "legal size = " << moveCount << std::endl;
+
+    int count = 0;
+    Move32 M = moves[0];
 
     // ==========================================
     // 1. 差分更新 (Incremental) で計算
     // ==========================================
     std::cout << "Incremental test" << std::endl;
     stateWithNNUE.init();
-    stateWithNNUE.doMove<Black>(moves[1]);
+    stateWithNNUE.doMove<Black>(M);
     print(state.getPosition());
 
     // 両方の視点から評価値を取得
     int32_t inc_score_black = nnue::eval::eval<Black>(stateWithNNUE);
     int32_t inc_score_white = nnue::eval::eval<White>(stateWithNNUE);
+    std::cout << "Black Eval: " << inc_score_black << std::endl;
+    std::cout << "White Eval: " << inc_score_white << std::endl;
+
+    auto moves1 = MoveGenerator::generateLegalMoves(state);
+    M = moves1[0];
+    stateWithNNUE.doMove<White>(M);
+    print(state.getPosition());
+
+    // 両方の視点から評価値を取得
+    inc_score_black = nnue::eval::eval<Black>(stateWithNNUE);
+    inc_score_white = nnue::eval::eval<White>(stateWithNNUE);
+    std::cout << "Black Eval: " << inc_score_black << std::endl;
+    std::cout << "White Eval: " << inc_score_white << std::endl;
+
+    stateWithNNUE.undoMove();
+    print(state.getPosition());
+
+    inc_score_black = nnue::eval::eval<Black>(stateWithNNUE);
+    inc_score_white = nnue::eval::eval<White>(stateWithNNUE);
     std::cout << "Black Eval: " << inc_score_black << std::endl;
     std::cout << "White Eval: " << inc_score_white << std::endl;
 
@@ -122,7 +149,7 @@ int main() {
     // ==========================================
     std::cout << "full Refresh test" << std::endl;
     stateWithNNUE.init();
-    state.doMove(moves[1]); // stateの盤面だけ進める
+    state.doMove(M); // stateの盤面だけ進める
     
     // アキュムレータを1から再構築
     stateWithNNUE.refresh_acc<Black>();
@@ -132,6 +159,21 @@ int main() {
     // 両方の視点から評価値を取得
     int32_t full_score_black = nnue::eval::eval<Black>(stateWithNNUE);
     int32_t full_score_white = nnue::eval::eval<White>(stateWithNNUE);
+    std::cout << "Black Eval: " << full_score_black << std::endl;
+    std::cout << "White Eval: " << full_score_white << std::endl;
+
+    M = moves1[0];
+
+    state.doMove(M);
+
+    // アキュムレータを1から再構築
+    stateWithNNUE.refresh_acc<Black>();
+    stateWithNNUE.refresh_acc<White>();
+    print(state.getPosition());
+
+    // 両方の視点から評価値を取得
+    full_score_black = nnue::eval::eval<Black>(stateWithNNUE);
+    full_score_white = nnue::eval::eval<White>(stateWithNNUE);
     std::cout << "Black Eval: " << full_score_black << std::endl;
     std::cout << "White Eval: " << full_score_white << std::endl;
 
