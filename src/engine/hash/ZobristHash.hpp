@@ -3,42 +3,44 @@
 
 #include <cstdint>
 
-// 駒の種類や色のルール
-enum Color { BLACK = 0, WHITE = 1, COLOR_NB = 2 };
+namespace nshogi
+{
+    namespace core
+    {
+        enum Square : int8_t;
+    }
+}
+using nshogi::core::Square;
+namespace nshogi
+{
+    namespace core
+    {
+        enum PieceTypeKind : uint8_t;
+        enum Color : uint8_t;
+        constexpr int NumPieceType = 15;
+        constexpr int NumColors = 2;
+    }
+}
+using nshogi::core::Color;
+using nshogi::core::NumColors;
+using nshogi::core::NumPieceType;
+using nshogi::core::PieceTypeKind;
 
-enum PieceType {
-    EMPTY = -1,
-    PAWN = 0,
-    LANCE,
-    KNIGHT,
-    SILVER,
-    BISHOP,
-    ROOK,
-    GOLD,
-    KING,
-    P_PAWN,
-    P_LANCE,
-    P_KNIGHT,
-    P_SILVER,
-    HORSE,
-    DRAGON,
-    PIECE_TYPE_NB = 14
-};
-
-class ZobristHash {
- public:
+class ZobristHash
+{
+public:
     ZobristHash(); // 初期化
 
     // 各種アクションのハッシュ更新関数
-    uint64_t update_move(uint64_t current, int from_sq, int to_sq, PieceType pt,
+    uint64_t update_move(uint64_t current, Square from_sq, Square to_sq, PieceTypeKind pt,
                          Color c);
-    uint64_t update_capture(uint64_t current, int from_sq, int to_sq,
-                            PieceType pt, PieceType captured_pt, Color c);
-    uint64_t update_drop(uint64_t current, int to_sq, PieceType pt, Color c);
+    uint64_t update_capture(uint64_t current, Square from_sq, Square to_sq,
+                            PieceTypeKind pt, PieceTypeKind captured_pt, Color c);
+    uint64_t update_drop(uint64_t current, Square to_sq, PieceTypeKind pt, Color c);
     uint64_t update_turn(uint64_t current);
 
- private:
-    uint64_t board_table[81][PIECE_TYPE_NB][COLOR_NB];
+private:
+    uint64_t board_table[81][NumPieceType][NumColors];
     uint64_t turn_hash;
     uint64_t seed;
     uint64_t current_hash;

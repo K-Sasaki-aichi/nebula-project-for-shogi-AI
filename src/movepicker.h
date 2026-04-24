@@ -100,9 +100,9 @@ namespace nebula::engine
                     if (!initialized_)
                         initializeAndSort_();
 
-                    while (goodIndex_ < scored_.size())
+                    while (goodIndex_ < scoredCaptures_.size())
                     {
-                        const auto mv = scored_[goodIndex_++].move;
+                        const auto mv = scoredCaptures_[goodIndex_++].move;
                         if (isDuplicateTT_(mv))
                             continue;
                         if (isStage2_(mv))
@@ -118,9 +118,9 @@ namespace nebula::engine
                     if (!initialized_)
                         initializeAndSort_();
 
-                    while (quietIndex_ < scored_.size())
+                    while (quietIndex_ < scoredQuiet_.size())
                     {
-                        const auto mv = scored_[quietIndex_++].move;
+                        const auto mv = scoredQuiet_[quietIndex_++].move;
                         if (isDuplicateTT_(mv))
                             continue;
                         if (!isStage2_(mv))
@@ -149,16 +149,27 @@ namespace nebula::engine
         {
             const auto moves = nshogi::core::MoveGenerator::generateLegalMoves(state_);
 
-            scored_.clear();
-            scored_.reserve(moves.size());
+            scoredCaptures_.clear();
+            scoredQuiet_.clear();
+
+            scoredCaptures_.reserve(moves.size());
+            scoredQuiet_.reserve(moves.size());
 
             for (std::size_t i = 0; i < moves.size(); ++i)
             {
                 const auto mv = moves[i];
-                scored_.push_back(ScoredMove{mv, scoreLight_(mv)});
+                ScoredMove sm{mv, scoreLight_(mv)};
+                if (isStage2_(mv))
+                {
+                    scoredCaptures_.push_back(sm);
+                }
+                else
+                {
+                    scoredQuiet_.push_back(sm);
+                }
             }
 
-            std::sort(scored_.begin(), scored_.end(),
+            std::sort(scoredCaptures_.begin(), scoredCaptures_.end(),
                       [](const ScoredMove &a, const ScoredMove &b)
                       {
                           return a.score > b.score;
@@ -218,7 +229,8 @@ namespace nebula::engine
         Stage stage_ = Stage::TTMove;
 
         bool initialized_ = false;
-        std::vector<ScoredMove> scored_;
+        std::vector<ScoredMove> scoredCaptures_;
+        std::vector<ScoredMove> scoredQuiet_;
         std::size_t goodIndex_ = 0;
         std::size_t quietIndex_ = 0;
     };
