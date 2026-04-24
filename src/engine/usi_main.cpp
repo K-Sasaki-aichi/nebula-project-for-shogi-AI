@@ -3,7 +3,7 @@
 #include "../nshogi/src/core/state.h"
 #include "../nshogi/src/core/statebuilder.h"
 #include "../nshogi/src/io/sfen.h"
-
+#include "StatewithNNUE.h" 
 #include "../model/weights.h"
 
 #include "search.h"
@@ -270,8 +270,8 @@ int main()
 
 		if (cmd == "usi")
 		{
-			std::cout << "id name Horiuchi_AI_TimeOptimized" << std::endl;
-			std::cout << "id author Horiuchi" << std::endl;
+			std::cout << "id name nebula" << std::endl;
+			std::cout << "id author Sasaki, Horiuchi" << std::endl;
 			std::cout << "usiok" << std::endl;
 			continue;
 		}

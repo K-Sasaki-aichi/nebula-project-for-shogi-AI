@@ -34,11 +34,11 @@ namespace engine
 
             if (side == Black){
                 st.doMove<Black>(mv);
-                v = -negamax<White>(st, 3, -INF, INF);
+                v = -negamax<White>(st, 3, -INF, alpha);
                 st.undoMove();
             }else{
                 st.doMove<White>(mv);
-                v = -negamax<Black>(st, 3, -INF, INF);
+                v = -negamax<Black>(st, 3, -INF, alpha);
                 st.undoMove();
             }
 

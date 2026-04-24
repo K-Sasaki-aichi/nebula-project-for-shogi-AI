@@ -33,7 +33,6 @@ namespace engine
         for (const auto mv : Moves){
             st.doMove<C>(mv);
             
-            // 【修正】std::max を使用
             value = std::max(value, -negamax<Oppo>(st, depth-1, -beta, -alpha));
             
             st.undoMove();
