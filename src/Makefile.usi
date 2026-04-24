@@ -13,7 +13,8 @@ CXXFLAGS ?= -std=c++2b -I./nshogi/src -mavx2 -O3
 
 # nshogi build output directory depends on BUILD and CXX (see nshogi/Makefile).
 NSHOGI_BUILD ?= release
-NSHOGI_OBJDIR := nshogi/build/$(NSHOGI_BUILD)_$(CXX)
+CXX ?= clang++
+NSHOGI_OBJDIR := nshogi/build/release_clang++
 LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static
 
 USI_TARGET ?= usi

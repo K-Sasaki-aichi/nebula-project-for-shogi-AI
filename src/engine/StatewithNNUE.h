@@ -6,6 +6,7 @@
 #include "../nshogi/src/core/movegenerator.h"
 #include "../model/weights.h"
 #include "../nshogi/src/core/internal/stateadapter.h"
+#include "../../nshogi/src/core/types.h"
 #include "nn/nnue_nn.h"
 #include <stdio.h>
 #include <string.h>
@@ -184,10 +185,14 @@ public:
     }
 
     StatewithNNUE()
-        : state(nshogi::core::StateBuilder::getInitialState()) {}
+        : state(nshogi::core::StateBuilder::getInitialState()) {
+            init();
+        }
 
     StatewithNNUE(nshogi::core::State&& s)
-        : state(std::move(s)) {}
+        : state(std::move(s)) {
+            init();
+        }
 
     template <nshogi::core::Color Us>
     void doMove(const nshogi::core::Move32& M){
@@ -512,7 +517,7 @@ public:
     }
 
     template <nshogi::core::Color C>
-    inline int32_t eval(StatewithNNUE& statewithNNUE){
+    inline int32_t eval(){
         return (nnue::NN::calNN<C>(st->acc) >> 4);
     }
 
