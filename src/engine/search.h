@@ -46,6 +46,6 @@ namespace engine
         return value;
     }
 
-    [[nodiscard]] nshogi::core::Move32 searchOnePlyNNUE(const nshogi::core::State &root);
+    [[nodiscard]] nshogi::core::Move32 searchNNUE(nnue::StatewithNNUE &st);
 
 } // namespace engine

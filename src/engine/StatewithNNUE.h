@@ -194,6 +194,13 @@ public:
             init();
         }
 
+    void doMove(const nshogi::core::Move32& M){
+        using namespace nshogi::core;
+        Color C = state.getSideToMove();
+        if(C == Black) doMove<Black>(M);
+        else           doMove<White>(M);
+    }
+
     template <nshogi::core::Color Us>
     void doMove(const nshogi::core::Move32& M){
         using namespace nshogi::core;
@@ -202,7 +209,6 @@ public:
         st++;
         *st = *prev_info;
 
-        // ★ まず何があっても盤面を動かす（状態を最新にする）
         state.doMove(M);
 
         if(M.pieceType() != PTK_King){
@@ -525,7 +531,8 @@ public:
 
     void setAcc(const int32_t index);
 
-    inline nshogi::core::State& getState(){return state;}
+    inline nshogi::core::State& getState() {return state;}
+    inline const nshogi::core::Position& getPosition() const {return state.getPosition();}
 
     nshogi::core::Color getSideToMove() const;
 

@@ -17,9 +17,9 @@ CXX ?= clang++
 NSHOGI_OBJDIR := nshogi/build/release_clang++
 LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static
 
-USI_TARGET ?= usi
+USI_TARGET ?= engine1.0
 USI_SRCS := \
-	engine/usi_main.cpp \
+	engine/usi.cpp \
 	engine/search.cpp \
 	engine/StatewithNNUE.cpp \
 	engine/nn/nnue_nn.cpp \
