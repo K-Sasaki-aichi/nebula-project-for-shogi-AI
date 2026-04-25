@@ -8,6 +8,8 @@
 
 namespace engine
 {
+    TranspositionTable TT; 
+
     // 引数を StatewithNNUE の参照に変更します
     SearchResult searchNNUE(nnue::StatewithNNUE &st)
     {
@@ -22,22 +24,23 @@ namespace engine
         const int size = rootMoves.size();
         if (size == 0) return result;
 
-        int32_t alpha = -INF - 1;
+        int16_t alpha = -INF - 1;
         nshogi::core::Move32 bestMove = rootMoves[0];
 
         const auto side = st.getSideToMove();
+        const int age = st.getPly();
 
         for (const auto mv : rootMoves)
         {
-            int32_t v;
+            int16_t v;
 
             if (side == Black){
                 st.doMove<Black>(mv); // 差分更新！
-                v = -negamax<White>(st, result.deepth, -INF, -alpha);
+                v = -negamax<White>(st, result.deepth, -INF, -alpha, age);
                 st.undoMove();
             } else {
                 st.doMove<White>(mv); // 差分更新！
-                v = -negamax<Black>(st, result.deepth, -INF, -alpha);
+                v = -negamax<Black>(st, result.deepth, -INF, -alpha, age);
                 st.undoMove();
             }
 

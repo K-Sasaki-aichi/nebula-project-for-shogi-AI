@@ -13,6 +13,7 @@
 
 namespace nnue {
 
-nshogi::core::Color StatewithNNUE::getSideToMove() const { return state.getSideToMove(); }
+
+
 
 }

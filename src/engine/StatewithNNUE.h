@@ -211,7 +211,7 @@ public:
 
         state.doMove(M);
 
-        if(M.pieceType() != PTK_King){
+        if(M.pieceType() != PTK_King)[[likely]]{
             // 玉以外なら、動いた後の盤面を使って差分更新
             updateIncremental<Us>(M);
             return;
@@ -296,54 +296,81 @@ public:
         std::memcpy(acc[C], weight::w_input.bias, sizeof(acc[C]));
     }
 
-    template <Color C>
+
+    // 持ち駒の特徴量抽出を行うインライン関数（ヘッダ等に記述するか、関数の直上に配置）
+    template<bool IsSameColor>
+    inline void extract_hand_features(int count, nshogi::core::PieceTypeKind type, int KingSqId, int* active_indices, int& local_num) {
+        using namespace nshogi::core;
+        using namespace nnue;
+
+        // コンパイラはこれを「ジャンプテーブル」として最適化し、ループ判定なしで一瞬で展開します
+        switch (count) {
+            case 18: active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 18); [[fallthrough]];
+            case 17: active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 17); [[fallthrough]];
+            case 16: active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 16); [[fallthrough]];
+            case 15: active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 15); [[fallthrough]];
+            case 14: active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 14); [[fallthrough]];
+            case 13: active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 13); [[fallthrough]];
+            case 12: active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 12); [[fallthrough]];
+            case 11: active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 11); [[fallthrough]];
+            case 10: active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 10); [[fallthrough]];
+            case 9:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 9);  [[fallthrough]];
+            case 8:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 8);  [[fallthrough]];
+            case 7:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 7);  [[fallthrough]];
+            case 6:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 6);  [[fallthrough]];
+            case 5:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 5);  [[fallthrough]];
+            case 4:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 4);  [[fallthrough]];
+            case 3:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 3);  [[fallthrough]];
+            case 2:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 2);  [[fallthrough]];
+            case 1:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 1);  [[fallthrough]];
+            case 0:  break;
+        }
+    }
+
+
+    template <nshogi::core::Color C>
     void extract_features(int& num_feature){
         using namespace nshogi::core;
         using namespace nnue;
 
-        //const Position& Pos = state.getPosition();
         internal::ImmutableStateAdapter adapter(state);
         Square king_sq = adapter->getKingSquare<C>();
-        
         const int KingSqId = SquareToSqId<C>(king_sq) * 1548;
 
+        int local_num = num_feature; // エイリアシング対策
+        auto* active_indices = indices[C];
+
         internal::bitboard::Bitboard bitboard;
-        int8_t count;
 
         #pragma unroll
         for(int pt = PTK_Pawn; pt < NumPieceType; pt++){
-            if (pt == PTK_King) {
-                continue;
-            }
+            if (pt == PTK_King) continue;
 
             PieceTypeKind type = static_cast<PieceTypeKind>(pt);
 
             bitboard = adapter->getBitboard<Black>(type);
             while (!bitboard.isZero()) {
-                Square sq = bitboard.popOne();
-                indices[C][num_feature++] = KingSqId + getSqIndex<C, Black>(type, sq);
+                active_indices[local_num++] = KingSqId + getSqIndex<C, Black>(type, bitboard.popOne());
             }
 
             bitboard = adapter->getBitboard<White>(type);
             while (!bitboard.isZero()) {
-                Square sq = bitboard.popOne();
-                indices[C][num_feature++] = KingSqId + getSqIndex<C, White>(type, sq);
+                active_indices[local_num++] = KingSqId + getSqIndex<C, White>(type, bitboard.popOne());
             }
 
             if(pt < PTK_King){
-                count = adapter->getStandCount<Black>(type);
-                for (int i = 1; i <= count; ++i) { // 1枚目からcount枚目まで全て足す
-                    indices[C][num_feature++] = KingSqId + getCapturedIndex<C==Black>(type, i);
-                }
+                // ループを排除し、ジャンプテーブルによる抽出関数を呼ぶ
+                int count_b = adapter->getStandCount<Black>(type);
+                extract_hand_features<C==Black>(count_b, type, KingSqId, active_indices, local_num);
 
-                // 敵の持ち駒
-                count = adapter->getStandCount<White>(type);
-                for (int i = 1; i <= count; ++i) {
-                    indices[C][num_feature++] = KingSqId + getCapturedIndex<C==White>(type, i);
-                }
+                int count_w = adapter->getStandCount<White>(type);
+                extract_hand_features<C==White>(count_w, type, KingSqId, active_indices, local_num);
             }
         }
+
+        num_feature = local_num;
     }
+
 
     template <Color C>
     void refresh_acc(){
@@ -363,6 +390,7 @@ public:
             __m256i a1 = _mm256_load_si256(reinterpret_cast<const __m256i*>(&acc[C][j + 16]));
 
             // 全ての特徴量の重みを「レジスタ上で」ひたすら足し込む
+            #pragma unroll
             for(int i = 0; i < num_feature; i++){
                 int feature_idx = indices[C][i];
                 const int16_t* ptr_weight = weight::w_input.weight[feature_idx];
@@ -434,6 +462,7 @@ public:
 
         int16_t* __restrict a_ptr_own = acc[Us];
         int16_t* __restrict a_ptr_oppo = acc[Oppo];
+
         for(int i = 0; i < weight::NumAcc; i += 32) {
             // アキュムレータをロード.
             __m256i a0_own = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr_own + i));
@@ -441,6 +470,7 @@ public:
             __m256i a0_oppo = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr_oppo + i));
             __m256i a1_oppo = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr_oppo + i + 16));
         
+            #pragma unroll
             for(int j = 0; j < num; j++){
                 // 重みのロード
                 const int16_t* ptr_sub_weight_own = weight::w_input.weight[ownDirty.subIndex[j]];
@@ -502,6 +532,7 @@ public:
         int16_t* __restrict a_ptr = acc[Oppo];
         const int16_t* ptr_sub_weight = weight::w_input.weight[sub_index];
         const int16_t* ptr_add_weight = weight::w_input.weight[add_index];
+        #pragma unroll
         for(int i = 0; i < weight::NumAcc; i += 32) {
             __m256i a0 = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr + i));
             __m256i a1 = _mm256_load_si256(reinterpret_cast<const __m256i*>(a_ptr + i + 16));
@@ -523,7 +554,7 @@ public:
     }
 
     template <nshogi::core::Color C>
-    inline int32_t eval(){
+    inline int16_t eval(){
         return (nnue::NN::calNN<C>(st->acc) >> 4);
     }
 
@@ -534,8 +565,9 @@ public:
     inline nshogi::core::State& getState() {return state;}
     inline const nshogi::core::Position& getPosition() const {return state.getPosition();}
 
-    nshogi::core::Color getSideToMove() const;
-
+    inline nshogi::core::Color getSideToMove() const { return state.getSideToMove(); }
+    inline uint16_t getPly() const { return state.getPly(); }
+    inline uint64_t getHash() { return state.getHash(); }
 };
 
 }//nnue

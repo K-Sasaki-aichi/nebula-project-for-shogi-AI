@@ -5,7 +5,8 @@
 #include "../nshogi/src/core/movegenerator.h" // Movesに必要
 #include "StatewithNNUE.h"
 #include "eval.h"
-#include <algorithm> // std::maxに必要
+#include "TT.h"
+#include <algorithm>
 #include <limits>
 
 namespace engine
@@ -14,7 +15,7 @@ namespace engine
     struct SearchResult {
         nshogi::core::Move32 bestMove = nshogi::core::Move32::MoveNone();
         int32_t score = 0; // 評価値
-        int32_t deepth = 4;
+        int32_t deepth = 5;
     };
 
     struct ScoredMove {
@@ -25,28 +26,21 @@ namespace engine
     inline void sortMoves(auto& moves, int size){
         std::vector<ScoredMove> ScoredMoves;
         ScoredMoves.reserve(size);
-
-
     }
 
     template<nshogi::core::Color C>
-    int32_t negamax(nnue::StatewithNNUE& st, int depth, int alpha, int beta){
+    int16_t negamax(nnue::StatewithNNUE& st, int depth, int16_t alpha, int16_t beta, int age){
+        int16_t oriAlpha = alpha;
         auto &state = st.getState();
         const auto repetition = state.getRepetitionStatus();
-        switch (repetition)
-        {
-        case nshogi::core::RepetitionStatus::WinRepetition: // 連続王手の千日手（価値）
-        case nshogi::core::RepetitionStatus::SuperiorRepetition: // 無意味なコマ捨ての連続
-            /* code */
-            break;
-        case nshogi::core::RepetitionStatus::LossRepetition:
-        case nshogi::core::RepetitionStatus::InferiorRepetition:
-            break;
-
-        case nshogi::core::RepetitionStatus::Repetition: // 千日手
-
-        default:
-            break;
+        // 千日手の判定
+        switch (repetition) {
+            case nshogi::core::RepetitionStatus::WinRepetition:      return 30000;  // 王手連続の千日手勝ち
+            case nshogi::core::RepetitionStatus::LossRepetition:     return -30000; // 王手連続の千日手負け
+            case nshogi::core::RepetitionStatus::Repetition:         return 0;      // 通常の千日手
+            case nshogi::core::RepetitionStatus::SuperiorRepetition: return 30000;
+            case nshogi::core::RepetitionStatus::InferiorRepetition: return -30000;
+            default: break;
         }
 
         if(depth == 0){
@@ -55,32 +49,44 @@ namespace engine
 
         // オーバーフローを防ぐため、安全な値をINFとする
         constexpr int INF = 30000;
-
-        
+        nshogi::core::Move32 best_move = nshogi::core::Move32::MoveNone();
         
         const auto Moves = nshogi::core::MoveGenerator::generateLegalMoves(state);
-        
-        // if(Moves.size() == 0) return -INF - depth;
 
         constexpr nshogi::core::Color Oppo = ~C;
         
         // 【修正】INT_MINではなく安全な負の無限大を使用
-        int32_t value = -INF - 1; 
+        int16_t best = -INF - 1;
+        int16_t value; 
+
+        int16_t tt_score;
+        uint64_t hash = st.getHash();
+        TTEntry* entry = TT.probe(hash);
+        if(TT.hasUseHash(entry, hash, depth, alpha, beta, &tt_score)) return tt_score;
 
         for (const auto mv : Moves){
             st.doMove<C>(mv);
             
-            value = std::max(value, -negamax<Oppo>(st, depth-1, -beta, -alpha));
+            value = std::max<int16_t>(value, -negamax<Oppo>(st, depth-1, -beta, -alpha, age));
             
             st.undoMove();
             
-            alpha = std::max(alpha, value);
+            if(value > best){
+                best = value;
+                best_move = mv;
+            }
+            alpha = std::max(alpha, best);
             if(alpha >= beta){
                 break;
             }
         }
 
-        return value;
+        uint32_t key = static_cast<uint32_t>(hash >> 32); 
+        if(best <= oriAlpha)  entry->save(key, best_move, best, 0, depth, BOUND_UPPER, age);
+        else if(best >= beta) entry->save(key, best_move, best, 0, depth, BOUND_LOWER, age);
+        else                  entry->save(key, best_move, best, 0, depth, BOUND_EXACT, age);
+
+        return best;
     }
 
     [[nodiscard]] SearchResult searchNNUE(nnue::StatewithNNUE &st);
