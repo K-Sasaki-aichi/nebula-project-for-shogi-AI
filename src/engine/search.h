@@ -57,7 +57,6 @@ namespace engine
         
         // 【修正】INT_MINではなく安全な負の無限大を使用
         int16_t best = -INF - 1;
-        int16_t value; 
 
         int16_t tt_score;
         uint64_t hash = st.getHash();
@@ -67,12 +66,12 @@ namespace engine
         for (const auto mv : Moves){
             st.doMove<C>(mv);
             
-            value = std::max<int16_t>(value, -negamax<Oppo>(st, depth-1, -beta, -alpha, age));
+            int16_t score = -negamax<Oppo>(st, depth-1, -beta, -alpha, age);
             
             st.undoMove();
             
-            if(value > best){
-                best = value;
+            if(score > best){
+                best = score;
                 best_move = mv;
             }
             alpha = std::max(alpha, best);
