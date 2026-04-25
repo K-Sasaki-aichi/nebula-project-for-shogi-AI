@@ -218,14 +218,16 @@ namespace
         if (ctx.nnue_weights_loaded)
         {
             // searchNNUE は nnue::StatewithNNUE& を受け取る想定
-            const auto mv = engine::searchNNUE(*ctx.state);
-            if (mv.isNone())
+            const auto result = engine::searchNNUE(*ctx.state);
+            if (result.bestMove.isNone())
             {
                 bestmove = "resign";
             }
             else
             {
-                bestmove = nshogi::io::sfen::move32ToSfen(mv);
+                bestmove = nshogi::io::sfen::move32ToSfen(result.bestMove);
+                std::cout << "info depth " << result.deepth << " score cp " << result.score 
+                          << " pv " << bestmove << std::endl;
             }
         }
         else
@@ -255,7 +257,7 @@ int main()
 
         if (cmd == "usi")
         {
-            std::cout << "id name nebula" << std::endl;
+            std::cout << "id name nebula_suisho1.0" << std::endl;
             std::cout << "id author Sasaki, Horiuchi" << std::endl;
             std::cout << "usiok" << std::endl;
             continue;
