@@ -10,7 +10,9 @@ CXX ?= clang++
 
 # Keep flags close to the existing src/makefile defaults.
 #CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O3
-CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O3 -g -fno-omit-frame-pointer
+#CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O3 -g -fno-omit-frame-pointer
+CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O2 -g -pg -fno-omit-frame-pointer
+LDFLAGS  += -pg
 
 # nshogi build output directory depends on BUILD and CXX (see nshogi/Makefile).
 NSHOGI_BUILD ?= release
@@ -18,7 +20,7 @@ CXX ?= clang++
 NSHOGI_OBJDIR := nshogi/build/release_clang++
 LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static
 
-USI_TARGET ?= engine_suishov1_5.exe
+USI_TARGET ?= engine_suisho1_5.exe
 USI_SRCS := \
 	engine/usi.cpp \
 	engine/search.cpp \

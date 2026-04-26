@@ -88,6 +88,19 @@ namespace engine
         return best;
     }
 
+    template<nshogi::core::Color C>
+    int16_t qsearch(nnue::StatewithNNUE& st, int depth, int16_t alpha, int16_t beta){
+        int16_t stand_pat = nnue::eval::eval<C>(st);
+        if(stand_pat >= beta){
+            return stand_pat;
+        }
+        if(stand_pat > alpha){
+            alpha = stand_pat;
+        }
+
+        if()
+    }
+
     [[nodiscard]] SearchResult searchNNUE(nnue::StatewithNNUE &st);
 
 } // namespace engine
