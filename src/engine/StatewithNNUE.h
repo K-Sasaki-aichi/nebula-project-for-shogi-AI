@@ -359,7 +359,6 @@ public:
             }
 
             if(pt < PTK_King){
-                // ループを排除し、ジャンプテーブルによる抽出関数を呼ぶ
                 int count_b = adapter->getStandCount<Black>(type);
                 extract_hand_features<C==Black>(count_b, type, KingSqId, active_indices, local_num);
 

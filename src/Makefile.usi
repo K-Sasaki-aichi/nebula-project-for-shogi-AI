@@ -9,7 +9,6 @@
 CXX ?= clang++
 NSHOGI_BUILD ?= release
 
-# ★ココがポイント！ CXX変数を使ってパスを動的に組み立てる
 NSHOGI_OBJDIR := nshogi/build/$(NSHOGI_BUILD)_$(CXX)
 
 # Keep flags close to the existing src/makefile defaults.
@@ -20,7 +19,7 @@ CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O3
 LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static
 #LDFLAGS  += -pg
 
-USI_TARGET ?= debug.exe
+USI_TARGET ?= beer1_8.exe
 USI_SRCS := \
 	engine/usi.cpp \
 	engine/search.cpp \

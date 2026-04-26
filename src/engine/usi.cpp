@@ -226,7 +226,7 @@ namespace
             else
             {
                 bestmove = nshogi::io::sfen::move32ToSfen(result.bestMove);
-                std::cout << "info depth " << result.deepth << " score cp " << result.score 
+                std::cout << "info depth " << result.depth << " score cp " << result.score 
                           << " pv " << bestmove << std::endl;
             }
         }
@@ -257,7 +257,7 @@ int main()
 
         if (cmd == "usi")
         {
-            std::cout << "id name debug" << std::endl;
+            std::cout << "id name nebula_w1.8" << std::endl;
             std::cout << "id author Sasaki, Horiuchi" << std::endl;
             std::cout << "usiok" << std::endl;
             continue;

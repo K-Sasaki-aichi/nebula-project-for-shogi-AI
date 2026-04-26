@@ -16,6 +16,7 @@ namespace engine
         using nshogi::core::Black;
         using nshogi::core::White;
 
+        const int depth = 5;
         const int INF = 30000;
         SearchResult result;
 
@@ -24,31 +25,60 @@ namespace engine
         const int size = rootMoves.size();
         if (size == 0) return result;
 
-        int16_t alpha = -INF - 1;
         nshogi::core::Move32 bestMove = rootMoves[0];
 
         const auto side = st.getSideToMove();
         const int age = st.getPly();
+        const uint64_t hash = st.getHash();
+        int16_t tt_score;
 
-        for (const auto mv : rootMoves)
-        {
-            int16_t v;
+        for(int i = 0; i < depth; i++){
+            int16_t alpha = -INF - 1;
 
-            if (side == Black){
-                st.doMove<Black>(mv); // 差分更新！
-                v = -negamax<White>(st, result.deepth, -INF, -alpha, age);
-                st.undoMove();
-            } else {
-                st.doMove<White>(mv); // 差分更新！
-                v = -negamax<Black>(st, result.deepth, -INF, -alpha, age);
-                st.undoMove();
+            nshogi::core::Move32 tt_move = result.bestMove; 
+            TTEntry* entry = TT.probe(hash);
+            if (tt_move == nshogi::core::Move32::MoveNone() && TT.isHit(entry, hash)) {
+                tt_move = entry->move;
             }
 
-            if (v > alpha) {
-                alpha = v;
-                result.bestMove = mv;
-                result.score = v;
+            const auto orderedMoves = sortMoves(st, rootMoves, tt_move);
+
+            switch (side)
+            {
+            case Black:
+                for(const auto& [mv, score] : orderedMoves) {
+                    int16_t v;
+                    st.doMove<Black>(mv);
+                    v = -negamax<White>(st, i, -INF, -alpha, age);
+                    st.undoMove();
+
+                    if (v > alpha) {
+                        alpha = v;
+                        result.bestMove = mv;
+                        result.score = v;
+                    }
+                }
+                break;
+            
+            default:
+                for(const auto& [mv, score] : orderedMoves) {
+                    int16_t v;
+                    st.doMove<White>(mv);
+                    v = -negamax<Black>(st, i, -INF, -alpha, age);
+                    st.undoMove();
+
+                    if (v > alpha) {
+                        alpha = v;
+                        result.bestMove = mv;
+                        result.score = v;
+                    }
+                }
+                break;
             }
+
+            // 反復深化の1つの深さ(i)の探索が終わった直後
+            TT.store(hash, result.bestMove, result.score, 0, i, BOUND_EXACT, age);
+
         }
 
         return result;
