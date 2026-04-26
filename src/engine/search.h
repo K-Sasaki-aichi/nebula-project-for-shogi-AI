@@ -97,8 +97,6 @@ namespace engine
         if(stand_pat > alpha){
             alpha = stand_pat;
         }
-
-        if()
     }
 
     [[nodiscard]] SearchResult searchNNUE(nnue::StatewithNNUE &st);

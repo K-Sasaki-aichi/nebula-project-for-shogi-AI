@@ -2242,6 +2242,53 @@ inline Move32* generateLegalMovesImpl(const StateImpl& S,
     return Moves;
 }
 
+/* ########### coded by sasaki ######################################*/
+template <Color C, bool WilyPromote>
+inline Move32* generateLegalCaptureMovesImpl(const StateImpl& S,
+                                             Move32* __restrict Moves,
+                                             const Bitboard& OpponentBB,
+                                             const Bitboard& OccupiedBB) noexcept {
+    // Captures.
+    Moves = generateOnBoardOneStepMovesImpl<C, true, WilyPromote>(
+        S, Moves, OpponentBB);
+    Moves = generateOnBoardSliderMovesImpl<C, true, WilyPromote>(
+        S, Moves, OpponentBB, OccupiedBB);
+
+    return Moves;
+}
+
+template <Color C, bool WilyPromote>
+inline Move32* generateLegalQsearchMovesImpl(const StateImpl& S,
+                                             Move32* Moves) noexcept {
+    const Bitboard CheckerBB = S.getCheckerBB();
+    const Bitboard BlackBB = S.getBitboard<Black>();
+    const Bitboard WhiteBB = S.getBitboard<White>();
+    const Bitboard OccupiedBB = BlackBB | WhiteBB;
+
+    if constexpr (C == Black) {
+        if (!CheckerBB.isZero()) {
+            // 王手されている場合は合法手を生成
+            Moves = generateLegalEvasionMovesImpl<Black, WilyPromote>(
+                S, Moves, CheckerBB, WhiteBB, OccupiedBB);
+        } else {
+            // 平常時は駒を取る手のみ生成
+            Moves = generateLegalCaptureMovesImpl<Black, WilyPromote>(
+                S, Moves, WhiteBB, OccupiedBB);
+        }
+    } else {
+        if (!CheckerBB.isZero()) {
+            Moves = generateLegalEvasionMovesImpl<White, WilyPromote>(
+                S, Moves, CheckerBB, BlackBB, OccupiedBB);
+        } else {
+            Moves = generateLegalCaptureMovesImpl<White, WilyPromote>(
+                S, Moves, BlackBB, OccupiedBB);
+        }
+    }
+
+    return Moves;
+}
+/*##################################################################*/
+
 template <Color C, bool WilyPromote>
 inline Move32* generateLegalCheckMovesImpl(const StateImpl& S,
                                            Move32* Moves) noexcept {
@@ -2417,6 +2464,24 @@ MoveGeneratorInternal::generateLegalEvasionMoves(const StateImpl& S) noexcept {
     return List;
 }
 
+/* ########### coded by sasaki ###################################### */
+template <Color C, bool WilyPromote>
+MoveList
+MoveGeneratorInternal::generateLegalQsearchMoves(const StateImpl& S) noexcept {
+    MoveList List;
+    List.Tail = generateLegalQsearchMovesImpl<C, WilyPromote>(S, List.Tail);
+    return List;
+}
+
+template <bool WilyPromote>
+MoveList
+MoveGeneratorInternal::generateLegalQsearchMoves(const StateImpl& S) noexcept {
+    return (S.getPosition().sideToMove() == Black)
+               ? generateLegalQsearchMoves<Black, WilyPromote>(S)
+               : generateLegalQsearchMoves<White, WilyPromote>(S);
+}
+/* ################################################################## */
+
 template <bool WilyPromote>
 MoveList
 MoveGeneratorInternal::generateLegalCheckMoves(const StateImpl& S) noexcept {
@@ -2463,6 +2528,21 @@ template MoveList MoveGeneratorInternal::generateLegalCheckMoves<false>(
     const StateImpl& S) noexcept;
 template MoveList MoveGeneratorInternal::generateLegalCheckMoves<true>(
     const StateImpl& S) noexcept;
+
+
+template MoveList MoveGeneratorInternal::generateLegalQsearchMoves<Black, false>(
+    const StateImpl& S) noexcept;
+template MoveList MoveGeneratorInternal::generateLegalQsearchMoves<Black, true>(
+    const StateImpl& S) noexcept;
+template MoveList MoveGeneratorInternal::generateLegalQsearchMoves<White, false>(
+    const StateImpl& S) noexcept;
+template MoveList MoveGeneratorInternal::generateLegalQsearchMoves<White, true>(
+    const StateImpl& S) noexcept;
+
+template MoveList
+MoveGeneratorInternal::generateLegalQsearchMoves<false>(const StateImpl& S) noexcept;
+template MoveList
+MoveGeneratorInternal::generateLegalQsearchMoves<true>(const StateImpl& S) noexcept;
 
 } // namespace internal
 } // namespace core

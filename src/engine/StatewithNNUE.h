@@ -568,6 +568,7 @@ public:
     inline nshogi::core::Color getSideToMove() const { return state.getSideToMove(); }
     inline uint16_t getPly() const { return state.getPly(); }
     inline uint64_t getHash() { return state.getHash(); }
+    inline bool isInCheck() const noexcept { return state.isInCheck(); }
 };
 
 }//nnue

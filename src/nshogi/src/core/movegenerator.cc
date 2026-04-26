@@ -40,6 +40,18 @@ MoveList MoveGenerator::generateLegalCheckMoves(const State& S) noexcept {
         *ImmutableStateAdapter(S).get());
 }
 
+template <Color C, bool WilyPromote>
+MoveList MoveGenerator::generateLegalQsearchMoves(const State& S) noexcept {
+    return MoveGeneratorInternal::generateLegalQsearchMoves<C, WilyPromote>(
+        *ImmutableStateAdapter(S).get());
+}
+
+template <bool WilyPromote>
+MoveList MoveGenerator::generateLegalQsearchMoves(const State& S) noexcept {
+    return MoveGeneratorInternal::generateLegalQsearchMoves<WilyPromote>(
+        *ImmutableStateAdapter(S).get());
+}
+
 template MoveList
 MoveGenerator::generateLegalMoves<Black, false>(const State& S) noexcept;
 template MoveList

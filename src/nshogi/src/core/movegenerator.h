@@ -48,6 +48,9 @@ class MoveGenerator {
     template <Color C, bool WilyPromote = true>
     static MoveList generateLegalCheckMoves(const State& S) noexcept;
 
+    template <Color C, bool WilyPromote = true>
+    static MoveList generateLegalQsearchMoves(const State& S) noexcept;
+
     ///
     /// @brief Generate all legal moves for a given state.
     /// @tparam WilyPromote If true, trivial non-promoting moves are ommited
@@ -63,6 +66,9 @@ class MoveGenerator {
     ///
     template <bool WilyPromote = true>
     static MoveList generateLegalCheckMoves(const State& S) noexcept;
+
+    template <bool WilyPromote = true>
+    static MoveList generateLegalQsearchMoves(const State& S) noexcept;
 };
 
 } // namespace core

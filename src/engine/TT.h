@@ -60,8 +60,8 @@ class TranspositionTable{
                 move = entry->move;
             }
 
-            // 1. 世代 (Age) が古いエントリは無条件で上書き
-            // 2. 世代が同じでも、今回の探索深さ (Depth) の方が深ければ上書き
+            // 世代 (Age) が古いエントリは無条件で上書き
+            // 世代が同じでも、今回の探索深さ (Depth) の方が深ければ上書き
             if (entry->getAge() != age || entry->depth <= depth) {
                 // entryポインタ経由でsaveを呼び出す
                 entry->save(key, move, score, eval, depth, bound, age);
