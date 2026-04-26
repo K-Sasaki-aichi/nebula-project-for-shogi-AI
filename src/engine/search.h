@@ -2,12 +2,14 @@
 
 #include "../../nshogi/src/core/types.h"
 #include "../nshogi/src/core/state.h"
-#include "../nshogi/src/core/movegenerator.h" // Movesに必要
+#include "../nshogi/src/core/movegenerator.h"
 #include "StatewithNNUE.h"
 #include "eval.h"
 #include "TT.h"
 #include <algorithm>
 #include <limits>
+
+#include "../nshogi/src/io/sfen.h"
 
 namespace engine
 {
@@ -29,6 +31,41 @@ namespace engine
     }
 
     template<nshogi::core::Color C>
+    int16_t qsearch(nnue::StatewithNNUE& st, int depth, int16_t alpha, int16_t beta){
+        int16_t stand_pat = nnue::eval::eval<C>(st);
+        if(stand_pat >= beta){
+            return stand_pat;
+        }
+        if(stand_pat > alpha){
+            alpha = stand_pat;
+        }
+
+        if (depth == 0) {
+            return alpha;
+        }
+
+        const auto Moves = nshogi::core::MoveGenerator::generateLegalQsearchMoves(st.getState());
+        std::cout << "info string " << "depth:" << depth << std::endl;
+
+        for(const auto mv : Moves){
+            std::string move = nshogi::io::sfen::move32ToSfen(mv);
+            std::cout << "info string " << move << std::endl;
+            st.doMove<C>(mv);
+            int16_t score = -qsearch<~C>(st, depth-1, -beta, -alpha);
+            st.undoMove();
+
+            if(score >= beta){
+                return score;
+            }
+            if(score > alpha){
+                alpha = score;
+            }
+        }
+
+        return alpha;
+    }
+
+    template<nshogi::core::Color C>
     int16_t negamax(nnue::StatewithNNUE& st, int depth, int16_t alpha, int16_t beta, int age){
         int16_t oriAlpha = alpha;
         auto &state = st.getState();
@@ -44,7 +81,7 @@ namespace engine
         }
 
         if(depth == 0){
-            return nnue::eval::eval<C>(st);
+            return qsearch<C>(st, 1, alpha, beta);
         }
 
         // オーバーフローを防ぐため、安全な値をINFとする
@@ -88,16 +125,6 @@ namespace engine
         return best;
     }
 
-    template<nshogi::core::Color C>
-    int16_t qsearch(nnue::StatewithNNUE& st, int depth, int16_t alpha, int16_t beta){
-        int16_t stand_pat = nnue::eval::eval<C>(st);
-        if(stand_pat >= beta){
-            return stand_pat;
-        }
-        if(stand_pat > alpha){
-            alpha = stand_pat;
-        }
-    }
 
     [[nodiscard]] SearchResult searchNNUE(nnue::StatewithNNUE &st);
 

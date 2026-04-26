@@ -1,1 +1,0 @@
-this directory's files aren't used if you code ai with C++.

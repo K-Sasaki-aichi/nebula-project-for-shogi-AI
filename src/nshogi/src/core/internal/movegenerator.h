@@ -32,21 +32,9 @@ class MoveGeneratorInternal {
     static MoveList
     generateLegalEvasionMoves(const internal::StateImpl& S) noexcept;
 
-    template <bool WilyPromote = true>
-    static MoveList generateLegalMoves(const internal::StateImpl& S) noexcept;
-
-    template <bool WilyPromote = true>
-    static MoveList
-    generateLegalCheckMoves(const internal::StateImpl& S) noexcept;
-
-
     template <Color C, bool WilyPromote = true>
     static MoveList
-    generateLegalQsearchMoves(const StateImpl& S) noexcept;
-
-    template <bool WilyPromote = true>
-    static MoveList
-    generateLegalQsearchMoves(const StateImpl& S) noexcept;
+    generateLegalCaptureMoves(const internal::StateImpl& S) noexcept;
 };
 
 } // namespace internal

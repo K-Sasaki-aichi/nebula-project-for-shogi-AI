@@ -94,12 +94,12 @@ class State {
     ///
     /// @brief Apply a legal move.
     ///
-    virtual void doMove(Move32 Move) noexcept;
+    void doMove(Move32 Move) noexcept;
 
     ///
     /// @brief Undo the last move.
     ///
-    virtual void undoMove();
+    void undoMove();
 
     ///
     /// @brief Get the repetition status of the state.

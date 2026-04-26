@@ -16,10 +16,10 @@ VERSION = $(shell cat NSHOGI_VERSION)
 
 OBJDIR = build/$(BUILD)_$(CXX)
 ifeq ($(shell uname), Darwin)
-    SHARED_TARGET_NAME := libnshogi.$(VERSION).dylib
+	SHARED_TARGET_NAME := libnshogi.$(VERSION).dylib
     SHARED_TARGET_NAME_NO_VERSION := libnshogi.dylib
 else
-    SHARED_TARGET_NAME := libnshogi.so.$(VERSION)
+	SHARED_TARGET_NAME := libnshogi.so.$(VERSION)
     SHARED_TARGET_NAME_NO_VERSION := libnshogi.so
 endif
 SHARED_TARGET := $(OBJDIR)/lib/$(SHARED_TARGET_NAME)
@@ -31,47 +31,55 @@ BENCH_TARGET := $(OBJDIR)/bin/nshogi_bench
 INCLUDES :=
 LINKS :=
 
+PYTHON ?= python3
+PYTHON_CONFIG ?= python3-config
+PYTHON_INCLUDES := $(shell $(PYTHON_CONFIG) --includes) $(shell $(PYTHON) -m pybind11 --includes)
+PYTHON_LINKS := $(shell $(PYTHON_CONFIG) --ldflags) -Wl,-undefined,dynamic_lookup
+PYTHON_TARGET := $(OBJDIR)/lib/nshogi$(shell $(PYTHON_CONFIG) --extension-suffix)
+
 ifeq ($(BUILD), debug)
-    # CXX_FLAGS = -std=c++2b -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fno-omit-frame-pointer -fsanitize=address -pipe
-    CXX_FLAGS = -std=c++2b -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fno-omit-frame-pointer -pipe
-    OPTIM = -g3
+	# CXX_FLAGS = -std=c++2b -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fno-omit-frame-pointer -fsanitize=address -pipe
+	CXX_FLAGS = -std=c++2b -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fno-omit-frame-pointer -pipe
+	PYTHON_CXX_FLAGS = $(CXX_FLAGS)
+	OPTIM = -g3
 else
-    # Windows(MSYS2)でのLLVMgoldエラーを回避するため、-flto を削除しています
-    CXX_FLAGS = -std=c++20 -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fomit-frame-pointer -fno-stack-protector -fno-rtti -DNDEBUG -pipe
-    OPTIM = -O3 -ffast-math
+	CXX_FLAGS = -std=c++20 -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fomit-frame-pointer -fno-stack-protector -fno-rtti -flto -DNDEBUG -pipe
+	# CXX_FLAGS = -std=c++20 -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fno-omit-frame-pointer -flto -pipe
+	PYTHON_CXX_FLAGS = -std=c++20 -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fomit-frame-pointer -fno-stack-protector -flto -DNDEBUG -pipe
+	OPTIM = -O3 -ffast-math
 endif
 
 SOURCES :=                                 \
-    src/buildinfo/capability.cc        \
-    src/core/initializer.cc            \
-    src/core/position.cc               \
-    src/core/positionbuilder.cc        \
-    src/core/state.cc                  \
-    src/core/statebuilder.cc           \
-    src/core/movegenerator.cc          \
-    src/core/huffman.cc                \
-    src/core/internal/bitboard.cc      \
-    src/core/internal/huffmanimpl.cc   \
-    src/core/internal/hash.cc          \
-    src/core/internal/movegenerator.cc \
-    src/core/internal/statehelper.cc   \
-    src/core/internal/stateimpl.cc     \
-    src/solver/mate1ply.cc             \
-    src/solver/internal/mate1ply.cc    \
-    src/solver/dfs.cc                  \
+	src/buildinfo/capability.cc        \
+	src/core/initializer.cc            \
+	src/core/position.cc               \
+	src/core/positionbuilder.cc        \
+	src/core/state.cc                  \
+	src/core/statebuilder.cc           \
+	src/core/movegenerator.cc          \
+	src/core/huffman.cc                \
+	src/core/internal/bitboard.cc      \
+	src/core/internal/huffmanimpl.cc   \
+	src/core/internal/hash.cc          \
+	src/core/internal/movegenerator.cc \
+	src/core/internal/statehelper.cc   \
+	src/core/internal/stateimpl.cc     \
+	src/solver/mate1ply.cc             \
+	src/solver/internal/mate1ply.cc    \
+	src/solver/dfs.cc                  \
     src/solver/dfpn.cc                 \
     src/solver/internal/dfpn.cc        \
-    src/ml/azteacher.cc                \
-    src/ml/featurebitboard.cc          \
-    src/ml/featurestack.cc             \
-    src/ml/simpleteacher.cc            \
-    src/ml/teacherloader.cc            \
-    src/ml/teacherwriter.cc            \
+	src/ml/azteacher.cc                \
+	src/ml/featurebitboard.cc          \
+	src/ml/featurestack.cc             \
+	src/ml/simpleteacher.cc            \
+	src/ml/teacherloader.cc            \
+	src/ml/teacherwriter.cc            \
     src/ml/utils.cc                    \
-    src/io/huffman.cc                  \
-    src/io/sfen.cc                     \
-    src/io/csa.cc                      \
-    src/io/file.cc                     \
+	src/io/huffman.cc                  \
+	src/io/sfen.cc                     \
+	src/io/csa.cc                      \
+	src/io/file.cc                     \
     src/c_api/api.cc                   \
     src/c_api/move.cc                  \
     src/c_api/position.cc              \
@@ -81,30 +89,34 @@ SOURCES :=                                 \
     src/c_api/io.cc
 
 TEST_SOURCES :=                         \
-    src/test/test_main.cc           \
-    src/test/test_types.cc      \
-    src/test/test_bitboard.cc       \
-    src/test/test_position.cc       \
-    src/test/test_state.cc          \
-    src/test/test_movegeneration.cc \
-    src/test/test_squareiterator.cc \
-    src/test/test_utils.cc          \
-    src/test/test_csa.cc        \
-    src/test/test_sfen.cc           \
-    src/test/test_huffman.cc        \
-    src/test/test_solver.cc     \
-    src/test/test_ml.cc             \
+	src/test/test_main.cc           \
+	src/test/test_types.cc 		\
+	src/test/test_bitboard.cc       \
+	src/test/test_position.cc       \
+	src/test/test_state.cc          \
+	src/test/test_movegeneration.cc \
+	src/test/test_squareiterator.cc \
+	src/test/test_utils.cc          \
+	src/test/test_csa.cc		\
+	src/test/test_sfen.cc           \
+	src/test/test_huffman.cc     	\
+	src/test/test_solver.cc		\
+	src/test/test_ml.cc             \
     src/test/test_capi.cc
 
 BENCH_SOURCES :=                          \
-    src/bench/bench_main.cc           \
-    src/bench/bench_movegeneration.cc \
-    src/bench/bench_mate1ply.cc       \
-    src/bench/bench_perft.cc
+	src/bench/bench_main.cc           \
+	src/bench/bench_movegeneration.cc \
+	src/bench/bench_mate1ply.cc       \
+	src/bench/bench_perft.cc
+
+PYTHON_SOURCES :=          \
+	src/python/bind.cc
 
 OBJECTS = $(patsubst %.cc,$(OBJDIR)/%.o,$(SOURCES))
 TEST_OBJECTS = $(patsubst %.cc,$(OBJDIR)/%.o,$(TEST_SOURCES))
 BENCH_OBJECTS = $(patsubst %.cc,$(OBJDIR)/%.o,$(BENCH_SOURCES))
+PYTHON_OBJECTS = $(patsubst %.cc,$(OBJDIR)/%.o,$(PYTHON_SOURCES))
 
 DEPENDINGS = $(patsubst %.cc,$(OBJDIR)/%.d,$(SOURCES))
 
@@ -143,7 +155,7 @@ endif
 PEXT ?= 1
 
 ifeq ($(PEXT),1)
-    CXX_FLAGS += -DUSE_PEXT
+	CXX_FLAGS += -DUSE_PEXT
 endif
 
 ifneq ($(MAKECMDGOALS),clean)
@@ -166,6 +178,10 @@ $(BENCH_OBJECTS): $(OBJDIR)/%.o: %.cc Makefile
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
 	$(CXX) -c -o $@ $(OPTIM) $(ARCH_FLAGS) $(CXX_FLAGS) $(INCLUDES) $<
 
+$(PYTHON_OBJECTS): $(OBJDIR)/%.o: %.cc Makefile
+	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
+	$(CXX) -c -o $@ $(OPTIM) $(ARCH_FLAGS) $(PYTHON_CXX_FLAGS) $(INCLUDES) $(PYTHON_INCLUDES) -fPIC $<
+
 $(SHARED_TARGET): $(OBJECTS)
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
 ifeq ($(shell uname), Darwin)
@@ -181,6 +197,14 @@ endif
 $(STATIC_TARGET): $(OBJECTS)
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
 	ar rcs $@ $^
+
+$(PYTHON_TARGET): $(PYTHON_OBJECTS) $(STATIC_TARGET)
+	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
+ifeq ($(shell uname), Darwin)
+	$(CXX) -shared -o $@ $(PYTHON_OBJECTS) $(STATIC_TARGET) $(OPTIM) $(ARCH_FLAGS) $(PYTHON_CXX_FLAGS) -fPIC $(LINKS) $(PYTHON_LINKS)
+else
+	$(CXX) -shared -o $@ $(PYTHON_OBJECTS) -Wl,--whole-archive $(STATIC_TARGET) -Wl,--no-whole-archive $(OPTIM) $(ARCH_FLAGS) $(PYTHON_CXX_FLAGS) -fPIC $(LINKS) $(PYTHON_LINKS)
+endif
 
 $(TEST_STATIC_TARGET): $(TEST_OBJECTS) $(STATIC_TARGET)
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
@@ -235,6 +259,18 @@ runtest-static: test-static
 .PHONY: runtest-shared
 runtest-shared: test-shared
 	./$(TEST_SHARED_TARGET)
+
+.PHONY: python
+python: PYTHON_CXX_FLAGS += -DVERSION=\"$(VERSION)\"
+python: $(PYTHON_TARGET)
+
+.PHONY: install-python
+install-python: python
+	cp $(PYTHON_TARGET) $(shell python3 -c "import site; print(site.getsitepackages()[0])")
+
+.PHONY: runtest-python
+runtest-python: python
+	PYTHONPATH=$(OBJDIR)/lib/ python3 src/test/python/test.py
 
 .PHONY: runbench
 runbench: bench

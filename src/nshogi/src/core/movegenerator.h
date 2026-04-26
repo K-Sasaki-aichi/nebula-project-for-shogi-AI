@@ -48,8 +48,15 @@ class MoveGenerator {
     template <Color C, bool WilyPromote = true>
     static MoveList generateLegalCheckMoves(const State& S) noexcept;
 
+    ///
+    /// @brief Generate all legal capture moves for a given state.
+    /// @tparam C The color of the side for which moves are begin generated.
+    ///         It must match the side to move in the provided state.
+    /// @tparam WilyPromote If true, trivial non-promoting moves are ommited
+    ///         to reduce the move set.
+    ///
     template <Color C, bool WilyPromote = true>
-    static MoveList generateLegalQsearchMoves(const State& S) noexcept;
+    static MoveList generateLegalCaptureMoves(const State& S) noexcept;
 
     ///
     /// @brief Generate all legal moves for a given state.
@@ -67,8 +74,13 @@ class MoveGenerator {
     template <bool WilyPromote = true>
     static MoveList generateLegalCheckMoves(const State& S) noexcept;
 
+    ///
+    /// @brief Generate all legal capture moves for a given state.
+    /// @tparam WilyPromote If true, trivial non-promoting moves are ommited
+    ///         to reduce the move set.
+    ///
     template <bool WilyPromote = true>
-    static MoveList generateLegalQsearchMoves(const State& S) noexcept;
+    static MoveList generateLegalCaptureMoves(const State& S) noexcept;
 };
 
 } // namespace core
