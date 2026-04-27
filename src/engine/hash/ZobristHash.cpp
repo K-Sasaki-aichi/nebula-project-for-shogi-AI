@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-// Simple xorshift64 PRNG for table initialization.
+// Simplea xorshift64 PRNG for table initialization.
 uint64_t ZobristHash::xorshift64()
 {
     seed ^= seed << 13;
