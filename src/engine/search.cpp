@@ -16,7 +16,7 @@ namespace engine
         using nshogi::core::Black;
         using nshogi::core::White;
 
-        const int depth = 7;
+        const int depth = 5;
         const int INF = 30000;
         SearchResult result;
 
