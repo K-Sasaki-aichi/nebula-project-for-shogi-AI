@@ -1,5 +1,5 @@
 // test_main.cpp
-#include "movepicker.h"
+#include "engine/movepicker.h"
 
 #include "nshogi/src/core/initializer.h"
 #include "nshogi/src/core/state.h"
