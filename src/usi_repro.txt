@@ -1,5 +1,0 @@
-usi
-isready
-position startpos
-go movetime 100
-quit

@@ -127,7 +127,7 @@ namespace engine
         }
 
         if(depth == 0){
-            return qsearch<C>(st, 1, alpha, beta);
+            return qsearch<C>(st, 16, alpha, beta);
         }
 
         // オーバーフローを防ぐため、安全な値をINFとする

@@ -1,0 +1,42 @@
+# makefile.book
+# 定石生成器 (bookgenerator) ビルド用
+
+# 1. コンパイラとビルド設定
+CXX        ?= g++
+BUILD      ?= release
+TARGET     := bookgenerator
+SRC        := bookgenerator.cpp
+
+# 2. nshogiのディレクトリ構成に合わせたパス設定
+# tools/ から見て 1つ上の src/nshogi を指定する
+NSHOGI_DIR    := ../src/nshogi
+NSHOGI_OBJDIR := $(NSHOGI_DIR)/build/$(BUILD)_$(CXX)
+NSHOGI_LIB    := $(NSHOGI_OBJDIR)/lib/libnshogi_static.a
+
+# 3. フラグの設定
+CXXFLAGS := -std=c++23 -I$(NSHOGI_DIR)/src -mtune=native -march=native -O3
+LDFLAGS  := -L$(NSHOGI_OBJDIR)/lib -lnshogi_static
+
+.PHONY: all clean nshogi_check nshogi
+
+# デフォルトターゲット
+all: nshogi_check $(TARGET)
+
+# bookgeneratorのビルド
+$(TARGET): $(SRC) $(NSHOGI_LIB)
+	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+
+# ライブラリが存在するかチェックし、なければビルド方法を提示
+nshogi_check:
+	@if [ ! -f $(NSHOGI_LIB) ]; then \
+		echo "Error: $(NSHOGI_LIB) が見つかりません。"; \
+		echo "まず 'mingw32-make -f makefile.book nshogi' を実行してライブラリをビルドしてください。"; \
+		exit 1; \
+	fi
+
+# nshogiライブラリ自体のビルドルール
+nshogi:
+	$(MAKE) -C $(NSHOGI_DIR) libnshogi BUILD=$(BUILD) AVX2=1 CXX=$(CXX)
+
+clean:
+	rm -f $(TARGET) $(TARGET).exe
