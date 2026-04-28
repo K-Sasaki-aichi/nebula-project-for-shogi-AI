@@ -25,7 +25,8 @@ USI_SRCS := \
 	engine/search.cpp \
 	engine/StatewithNNUE.cpp \
 	engine/nn/nnue_nn.cpp \
-	model/weights.cpp
+	model/weights.cpp \
+	book/book.cpp
 
 .PHONY: usi nshogi clean
 

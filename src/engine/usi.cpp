@@ -5,6 +5,7 @@
 #include "../nshogi/src/io/sfen.h"
 #include "StatewithNNUE.h" 
 #include "../model/weights.h"
+#include "../book/book.h"
 
 #include "search.h"
 
@@ -68,6 +69,7 @@ namespace
         // nshogi::core::State から nnue::StatewithNNUE に変更
         std::optional<nnue::StatewithNNUE> state;
         bool nnue_weights_loaded = false;
+        bool book_loaded = false;
 
         EngineContext()
         {
@@ -91,6 +93,26 @@ namespace
         else
         {
             std::cerr << "[usi] NNUE weight loaded." << std::endl;
+        }
+    }
+
+    void ensureBookLoaded(EngineContext &ctx)
+    {
+        if (ctx.book_loaded)
+        {
+            return;
+        }
+
+        // book.h で定義した loadBook を呼び出す
+        // ファイルが見つからない等のエラー処理は loadBook 内で行う想定
+        try {
+            loadBook("book/book2.bin");
+            ctx.book_loaded = true;
+            std::cerr << "[usi] Book loaded." << std::endl;
+        } catch (const std::exception &e) {
+            std::cerr << "[usi] Book load failed: " << e.what() << std::endl;
+            // 失敗しても探索はできるので、フラグだけ立てて何度も読みに行かないようにする
+            ctx.book_loaded = true; 
         }
     }
 
@@ -266,6 +288,7 @@ int main()
         if (cmd == "isready")
         {
             ensureNNUEWeightsLoaded(ctx);
+            ensureBookLoaded(ctx);
             std::cout << "readyok" << std::endl;
             continue;
         }

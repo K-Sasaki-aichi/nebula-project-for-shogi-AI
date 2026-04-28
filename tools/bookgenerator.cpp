@@ -4,7 +4,6 @@
 #include "../src/nshogi/src/core/state.h"
 #include "../src/nshogi/src/core/position.h"
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <iostream>
 #include <filesystem>
@@ -12,7 +11,6 @@
 #include <utility>
 #include <algorithm>
 #include <tuple>
-#include <regex>
 
 namespace fs = std::filesystem;
 using Move32 = nshogi::core::Move32;
@@ -23,63 +21,45 @@ const nshogi::core::State base_hirate_state = nshogi::core::StateBuilder::getIni
 int max_over_count = 0;
 
 /* 設定 */
-const double min_rate = 3000;
-const int ply_set = 35;
+const double min_rate = 2800; // レートの加減
+const int ply_set = 40;       // 何手までの定石か
+const int min_count = 4;      // その局面が出現するべき最小値
 
-
-// レーティング制限関数（正規表現を用いた堅牢版）
+// 【改善点1】高速版：レーティング制限関数（正規表現を使わない）
 bool isHighQualityGame(const std::string& csa_data, double threshold = 2800.0) {
-    double black_rate = 0.0;
-    double white_rate = 0.0;
-
-    // 正規表現パターン: 
-    // ^'black_rate: (任意の文字列) : (数値) を抽出する
-    // 最後のキャプチャグループ ([-+]?[0-9]*\.?[0-9]+) で数値を捉える
-    std::regex black_regex(R"('black_rate:.*:([-+]?[0-9]*\.?[0-9]+))");
-    std::regex white_regex(R"('white_rate:.*:([-+]?[0-9]*\.?[0-9]+))");
-    
-    std::smatch match;
-
-    // 先手レートの抽出
-    if (std::regex_search(csa_data, match, black_regex)) {
+    auto extractRate = [](const std::string& data, const std::string& key) -> double {
+        size_t pos = data.find(key);
+        if (pos == std::string::npos) return 0.0;
+        
+        pos += key.length();
+        size_t nl_pos = data.find('\n', pos); // 行末を探す
+        if (nl_pos == std::string::npos) nl_pos = data.length();
+        
+        std::string line = data.substr(pos, nl_pos - pos);
+        
+        // 最後の ':' 以降の数値を抽出する
+        size_t last_colon = line.find_last_of(':');
         try {
-            black_rate = std::stod(match[1].str());
+            if (last_colon != std::string::npos) {
+                return std::stod(line.substr(last_colon + 1));
+            } else {
+                return std::stod(line);
+            }
         } catch (...) {
-            black_rate = 0.0;
+            return 0.0;
         }
-    }
+    };
 
-    // 後手レートの抽出
-    if (std::regex_search(csa_data, match, white_regex)) {
-        try {
-            white_rate = std::stod(match[1].str());
-        } catch (...) {
-            white_rate = 0.0;
-        }
-    }
+    double black_rate = extractRate(csa_data, "'black_rate:");
+    // 先手が基準を満たしていなければ後手を調べる前に弾く（高速化）
+    if (black_rate < threshold) return false;
 
-    // デバッグ用出力（正常に抽出できているか確認するため。確認後は消してOK）
-    /*
-    if (black_rate > 0.0 || white_rate > 0.0) {
-        std::cout << "[Parse] Black: " << black_rate << ", White: " << white_rate << std::endl;
-    }
-    */
-
-    return (black_rate >= threshold && white_rate >= threshold);
+    double white_rate = extractRate(csa_data, "'white_rate:");
+    return white_rate >= threshold;
 }
 
-//  定跡追加関数
+// 定跡追加関数
 void addBookBuf(const nshogi::core::State& full_state, std::vector<std::pair<uint64_t, Move32>>& bookBuf) {
-    /* ---- 平手に関わらず定跡を作りたいならこっち ---------- */
-    // nshogi::core::State current_state = full_state.clone();
-    // int total_ply = current_state.getPly();
-
-    // // 2. 0手目（初期局面）まで指し手をすべて巻き戻す
-    // while (current_state.getPly() > 0) {
-    //     current_state.undoMove();
-    // }
-    /* --------------------------------------------------- */
-
     // 平手専用
     nshogi::core::State current_state = base_hirate_state.clone();
 
@@ -183,7 +163,8 @@ void saveBook(){
             }
         }
 
-        optimized_book.push_back({current_hash, best_move, max_count});
+        if(max_count >= min_count) optimized_book.push_back({current_hash, best_move, max_count});
+        
         current = next_hash_it;
     }
 
@@ -203,12 +184,20 @@ void saveBook(){
     std::cout << "Complete!" << std::endl <<  "book.bin generated successfully." << std::endl;
 }
 
+// 【改善点2】高速版：ファイル読み込み（stringstreamを廃止し、バイナリで一括読み込み）
 std::string readFile(const std::string& path) {
-    std::ifstream ifs(path);
+    std::ifstream ifs(path, std::ios::binary); 
     if (!ifs) throw std::runtime_error("File not found: " + path);
-    std::stringstream ss;
-    ss << ifs.rdbuf();
-    return ss.str();
+    
+    ifs.seekg(0, std::ios::end);
+    size_t size = ifs.tellg();
+    if (size == 0) return "";
+    
+    std::string buffer(size, '\0');
+    ifs.seekg(0, std::ios::beg);
+    ifs.read(&buffer[0], size);
+    
+    return buffer;
 }
 
 void bookgenerator(const std::string& dir){
@@ -218,10 +207,13 @@ void bookgenerator(const std::string& dir){
     int file_count = 0;
 
     std::vector<std::pair<uint64_t, Move32>> bookBuf;
+    
+    // 【改善点3】メモリの事前確保（再確保によるオーバーヘッドを削減）
+    bookBuf.reserve(500000); 
 
     for (const auto& entry : fs::directory_iterator(dir)) {
         try {
-            // 進捗表示 (100局ごと)
+            // 進捗表示 (1000局ごと)
             if (file_count % 1000 == 0) {
                 std::cout << "file :  " << file_count << std::endl;
                 std::cout << "Processed " << processed_count << " high-quality games." << std::endl;
@@ -232,7 +224,7 @@ void bookgenerator(const std::string& dir){
             std::string path = entry.path().string();
             std::string csa_data = readFile(path);
 
-            // R3000以上かチェック
+            // R2800以上かチェック
             if (!isHighQualityGame(csa_data, min_rate)) {
                 file_count++;
                 continue;
@@ -243,6 +235,7 @@ void bookgenerator(const std::string& dir){
 
             // 平手かどうかのチェック
             if (nshogi::io::csa::positionToCSA(state.getInitialPosition()) != hirate_csa_str) {
+                file_count++;
                 continue;
             }
 
@@ -251,8 +244,8 @@ void bookgenerator(const std::string& dir){
             processed_count++;
             file_count++;
 
-            // 10000局ごとにbookと合わせる.
-            if (processed_count % 10000 == 0) {
+            // 10000局ごとにbookと合わせる
+            if (processed_count > 0 && processed_count % 10000 == 0) {
                 std::sort(bookBuf.begin(), bookBuf.end(), [](const auto& a, const auto& b) {
                     return a.first < b.first;
                 });
@@ -266,11 +259,13 @@ void bookgenerator(const std::string& dir){
         }
     }
     
-    // 残ったものを定石に入れる.
-    std::sort(bookBuf.begin(), bookBuf.end(), [](const auto& a, const auto& b) {
-        return a.first < b.first;
-    });
-    addBook(bookBuf);
+    // 残ったものを定跡に入れる
+    if (!bookBuf.empty()) {
+        std::sort(bookBuf.begin(), bookBuf.end(), [](const auto& a, const auto& b) {
+            return a.first < b.first;
+        });
+        addBook(bookBuf);
+    }
 
     std::cout << "Total processed games: " << processed_count << std::endl;
     std::cout << "Total book entries: " << book.size() << std::endl;

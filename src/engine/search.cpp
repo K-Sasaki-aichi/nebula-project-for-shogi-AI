@@ -3,6 +3,7 @@
 #include "eval.h"
 #include "../nshogi/src/core/movegenerator.h"
 #include "../../nshogi/src/core/types.h"
+#include "../book/book.h"
 
 #include <cstdint>
 
@@ -16,9 +17,17 @@ namespace engine
         using nshogi::core::Black;
         using nshogi::core::White;
 
-        const int depth = 5;
+        const int depth = 6;
         const int INF = 30000;
         SearchResult result;
+
+        const uint64_t hash = st.getHash();
+        const nshogi::core::Move32 b_move = findBookMove(hash);
+        if (!b_move.isNone()) {
+            std::cout << "info string book hit" << std::endl;
+            result.bestMove = b_move;
+            return result;
+        }
 
         // st.getState() で内部の盤面状態を取得して合法手を生成
         const auto rootMoves = nshogi::core::MoveGenerator::generateLegalMoves(st.getState());
@@ -29,7 +38,6 @@ namespace engine
 
         const auto side = st.getSideToMove();
         const int age = st.getPly();
-        const uint64_t hash = st.getHash();
         int16_t tt_score;
 
         for(int i = 0; i < depth; i++){
