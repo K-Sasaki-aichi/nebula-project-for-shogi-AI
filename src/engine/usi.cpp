@@ -279,7 +279,7 @@ int main()
 
         if (cmd == "usi")
         {
-            std::cout << "id name nebula_debug1.8" << std::endl;
+            std::cout << "id name nebula_2.0" << std::endl;
             std::cout << "id author Sasaki, Horiuchi" << std::endl;
             std::cout << "usiok" << std::endl;
             continue;

@@ -11,7 +11,7 @@
 static std::vector<BookEntry> g_loaded_book;
 
 // 起動時に1回だけ呼ぶ
-void loadBook(const std::string& filename = "book/book.bin") {
+void loadBook(const std::string& filename = "book/book2.bin") {
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs) {
         // デバッグ用にファイルがない場合はメッセージを出す

@@ -1,9 +1,9 @@
 // movepicker.h
 #pragma once
 
-#include "nshogi/src/core/movegenerator.h"
-#include "nshogi/src/core/state.h"
-#include "nshogi/src/core/types.h"
+#include "core/movegenerator.h"
+#include "core/state.h"
+#include "core/types.h"
 
 #include <array>
 #include <cstddef>
@@ -15,7 +15,7 @@
 #include "engine/TT.h"
 #endif
 
-namespace nebula::engine
+namespace engine
 {
     inline constexpr ::std::array<int, ::nshogi::core::NumPieceType> pieceValueTable = {
         0,    // Empty
@@ -83,25 +83,28 @@ namespace nebula::engine
     }
 #endif
 
+    template<bool isQsearch>
     class MovePicker
     {
     public:
         MovePicker(const ::nshogi::core::State &state, const OrderingInfo &info)
-            : state_(state), info_(info) {}
+            : state_(state), info_(info) 
+        {
+            ensureInitialized_();
+        }
 
         MovePicker(const ::nshogi::core::State &state, ::nshogi::core::Move32 hashMove)
             : state_(state)
         {
             info_.hashMove = hashMove;
+            ensureInitialized_();
         }
 
-        ::std::optional<::nshogi::core::Move32> next()
+        ::nshogi::core::Move32 next()
         {
-            ensureInitialized_();
-
             const auto mv = getNextMove_();
             if (mv.isNone())
-                return ::std::nullopt;
+                return nshogi::core::Move32::MoveNone();
             return mv;
         }
 
@@ -148,6 +151,7 @@ namespace nebula::engine
 
             if (!info_.killer1.isNone() && mv == info_.killer1)
                 return 400'000;
+                
             if (!info_.killer2.isNone() && mv == info_.killer2)
                 return 399'000;
 
@@ -180,20 +184,27 @@ namespace nebula::engine
             return moves_[index_++].move;
         }
 
+
         void ensureInitialized_()
         {
             if (initialized_)
                 return;
 
-            const auto legalMoves = ::nshogi::core::MoveGenerator::generateLegalMoves(state_);
-
-            count_ = 0;
-            index_ = 0;
-            for (const auto mv : legalMoves)
-            {
-                if (count_ >= MaxMoves)
-                    break;
-                moves_[count_++] = ScoredMove{mv, scoreMove_(mv)};
+            if constexpr(isQsearch){
+                const auto legalMoves = ::nshogi::core::MoveGenerator::generateLegalCaptureMoves(state_);
+                for (const auto mv : legalMoves)
+                {
+                    // if (count_ >= MaxMoves) break; // 念のための安全装置
+                    moves_[count_++] = ScoredMove{mv, scoreMove_(mv)};
+                }
+            } else {
+                // 全合法手の生成とスコアリング
+                const auto legalMoves = ::nshogi::core::MoveGenerator::generateLegalMoves(state_);
+                for (const auto mv : legalMoves)
+                {
+                    // if (count_ >= MaxMoves) break;
+                    moves_[count_++] = ScoredMove{mv, scoreMove_(mv)};
+                }
             }
 
             initialized_ = true;

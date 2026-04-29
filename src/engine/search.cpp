@@ -29,18 +29,11 @@ namespace engine
             return result;
         }
 
-        // st.getState() で内部の盤面状態を取得して合法手を生成
-        const auto rootMoves = nshogi::core::MoveGenerator::generateLegalMoves(st.getState());
-        const int size = rootMoves.size();
-        if (size == 0) return result;
-
-        nshogi::core::Move32 bestMove = rootMoves[0];
-
         const auto side = st.getSideToMove();
         const int age = st.getPly();
         int16_t tt_score;
 
-        for(int i = 0; i < depth; i++){
+        for(int i = 1; i <= depth; i++){
             int16_t alpha = -INF - 1;
 
             nshogi::core::Move32 tt_move = result.bestMove; 
@@ -49,38 +42,48 @@ namespace engine
                 tt_move = entry->move;
             }
 
-            const auto orderedMoves = sortMoves(st, rootMoves, tt_move);
+            if (TT.isHit(entry, hash)) { 
+                tt_move = entry->move;
+            }
+
+            MovePicker<false> moves(st.getState(), tt_move);
+
+            auto mv = moves.next();
 
             switch (side)
             {
             case Black:
-                for(const auto& [mv, score] : orderedMoves) {
-                    int16_t v;
-                    st.doMove<Black>(mv);
-                    v = -negamax<White>(st, i, -INF, -alpha, age);
+                while(mv != nshogi::core::Move32::MoveNone()){
+                    st.doMove<Black>(mv);    
+                    int16_t score = -negamax<White>(st, i-1, -INF, -alpha, age, 0);    
                     st.undoMove();
-
-                    if (v > alpha) {
-                        alpha = v;
+                    
+                    if (score > alpha) {
+                        alpha = score;
                         result.bestMove = mv;
-                        result.score = v;
+                        result.score = score;
                     }
+
+                    mv = moves.next();
                 }
+            
                 break;
             
             default:
-                for(const auto& [mv, score] : orderedMoves) {
-                    int16_t v;
-                    st.doMove<White>(mv);
-                    v = -negamax<Black>(st, i, -INF, -alpha, age);
+                while(mv != nshogi::core::Move32::MoveNone()){
+                    st.doMove<White>(mv);    
+                    int16_t score = -negamax<Black>(st, i-1, -INF, -alpha, age, 0);    
                     st.undoMove();
-
-                    if (v > alpha) {
-                        alpha = v;
+                    
+                    if (score > alpha) {
+                        alpha = score;
                         result.bestMove = mv;
-                        result.score = v;
+                        result.score = score;
                     }
+
+                    mv = moves.next();
                 }
+
                 break;
             }
 

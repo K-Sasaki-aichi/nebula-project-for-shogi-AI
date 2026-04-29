@@ -21,7 +21,7 @@ const nshogi::core::State base_hirate_state = nshogi::core::StateBuilder::getIni
 int max_over_count = 0;
 
 /* 設定 */
-const double min_rate = 2800; // レートの加減
+const double min_rate = 2800; // レートの下限
 const int ply_set = 40;       // 何手までの定石か
 const int min_count = 4;      // その局面が出現するべき最小値
 

@@ -1,11 +1,12 @@
 #pragma once
 
-#include "../../nshogi/src/core/types.h"
+#include "../nshogi/src/core/types.h"
 #include "../nshogi/src/core/state.h"
 #include "../nshogi/src/core/movegenerator.h"
 #include "StatewithNNUE.h"
 #include "eval.h"
 #include "TT.h"
+#include "movepicker.h"
 #include <algorithm>
 #include <vector>
 #include <limits>
@@ -22,61 +23,6 @@ namespace engine
         int32_t depth = 5;
     };
 
-    // オーダリング用の指し手とスコアのペア
-    struct ScoredMove {
-        nshogi::core::Move32 move;
-        int score;
-    };
-
-    constexpr int PieceValueTable[nshogi::core::NumPieceType] = {
-        0,      // PTK_Empty   (0)
-        100,    // PTK_Pawn    (1)
-        300,    // PTK_Lance   (2)
-        300,    // PTK_Knight  (3)
-        500,    // PTK_Silver  (4)
-        800,    // PTK_Bishop  (5)
-        1000,   // PTK_Rook    (6)
-        600,    // PTK_Gold    (7)
-        10000,  // PTK_King    (8)
-        600,    // PTK_ProPawn   (9)
-        600,    // PTK_ProLance  (10)
-        600,    // PTK_ProKnight (11)
-        600,    // PTK_ProSilver (12)
-        1050,   // PTK_ProBishop (13)
-        1250    // PTK_ProRook   (14)
-    };
-
-    // 指し手にスコアを付ける関数（MVV-LVA + 置換表の手 + 成り）
-    inline int scoreMove(const nnue::StatewithNNUE& st, nshogi::core::Move32 mv, nshogi::core::Move32 ttMove = nshogi::core::Move32::MoveNone()) {
-        if (mv == ttMove) {
-            return 1000000; // 置換表の最善手を最優先
-        }
-
-        int score = 0;
-
-        const int capPieceValue = PieceValueTable[mv.capturePieceType()];
-
-        score += (capPieceValue != 0) * (100000 + capPieceValue - PieceValueTable[mv.pieceType()]);
-
-        score += (mv.promote()) * 50000;
-
-        return score;
-    }
-
-    inline std::vector<ScoredMove> sortMoves(const nnue::StatewithNNUE& st, const auto& moves, nshogi::core::Move32 ttMove = nshogi::core::Move32::MoveNone()) {
-        std::vector<ScoredMove> scoredMoves;
-        scoredMoves.reserve(moves.size());
-
-        for (const auto mv : moves) {
-            scoredMoves.push_back({mv, scoreMove(st, mv, ttMove)});
-        }
-
-        std::sort(scoredMoves.begin(), scoredMoves.end(), [](const ScoredMove& a, const ScoredMove& b) {
-            return a.score > b.score;
-        });
-
-        return scoredMoves;
-    }
 
     template<nshogi::core::Color C>
     int16_t qsearch(nnue::StatewithNNUE& st, int depth, int16_t alpha, int16_t beta){
@@ -92,46 +38,50 @@ namespace engine
             return alpha;
         }
 
-        const auto Moves = nshogi::core::MoveGenerator::generateLegalCaptureMoves(st.getState());
-        const auto orderedMoves = sortMoves(st, Moves);
+        auto &state = st.getState();
+        MovePicker<true> moves(state, nshogi::core::Move32::MoveNone());
 
-        for(const auto& [mv, orderingScore] : orderedMoves){
+        auto mv = moves.next();
+        while(mv != nshogi::core::Move32::MoveNone()){
             st.doMove<C>(mv);
             int16_t score = -qsearch<~C>(st, depth-1, -beta, -alpha);
             st.undoMove();
-
+            
             if(score >= beta){
                 return score;
             }
             if(score > alpha){
                 alpha = score;
             }
+
+            mv = moves.next();
         }
 
         return alpha;
     }
 
     template<nshogi::core::Color C>
-    int16_t negamax(nnue::StatewithNNUE& st, int depth, int16_t alpha, int16_t beta, int age){
+    int16_t negamax(nnue::StatewithNNUE& st, int depth, int16_t alpha, int16_t beta, int age, int ply){
+        // オーバーフローを防ぐため、安全な値をINFとする
+        constexpr int INF = 30000;
+
         int16_t oriAlpha = alpha;
         auto &state = st.getState();
         const auto repetition = state.getRepetitionStatus();
         // 千日手の判定
         switch (repetition) {
-            case nshogi::core::RepetitionStatus::WinRepetition:      return 30000;  // 王手連続の千日手勝ち
-            case nshogi::core::RepetitionStatus::LossRepetition:     return -30000; // 王手連続の千日手負け
+            case nshogi::core::RepetitionStatus::WinRepetition:      return 30000-ply;  // 王手連続の千日手勝ち
+            case nshogi::core::RepetitionStatus::LossRepetition:     return -30000+ply; // 王手連続の千日手負け
             case nshogi::core::RepetitionStatus::Repetition:         return 0;      // 通常の千日手
-            case nshogi::core::RepetitionStatus::SuperiorRepetition: return 30000;
-            case nshogi::core::RepetitionStatus::InferiorRepetition: return -30000;
+            case nshogi::core::RepetitionStatus::SuperiorRepetition: return 30000-ply;
+            case nshogi::core::RepetitionStatus::InferiorRepetition: return -30000+ply;
             default: break;
         }
 
         if(depth == 0){
-            return qsearch<C>(st, 16, alpha, beta);
+            return qsearch<C>(st, 50, alpha, beta);
         }
 
-        // オーバーフローを防ぐため、安全な値をINFとする
-        constexpr int INF = 30000;
         nshogi::core::Move32 best_move = nshogi::core::Move32::MoveNone();
 
         constexpr nshogi::core::Color Oppo = ~C;
@@ -152,16 +102,18 @@ namespace engine
             tt_move = entry->move;
         }
 
-        const auto Moves = nshogi::core::MoveGenerator::generateLegalMoves(state);
-        const auto orderedMoves = sortMoves(st, Moves, tt_move);
+        MovePicker<false> moves(state, tt_move);
 
-        for (const auto& [mv, orderingScore] : orderedMoves){
-            st.doMove<C>(mv);
-            
-            int16_t score = -negamax<Oppo>(st, depth-1, -beta, -alpha, age);
-            
+        int legal_moves_played = 0;
+
+        auto mv = moves.next();
+        while(mv != nshogi::core::Move32::MoveNone()){
+            st.doMove<C>(mv);    
+            int16_t score = -negamax<Oppo>(st, depth-1, -beta, -alpha, age, ply+1);    
             st.undoMove();
             
+            legal_moves_played++;
+
             if(score > best){
                 best = score;
                 best_move = mv;
@@ -170,6 +122,14 @@ namespace engine
             if(alpha >= beta){
                 break;
             }
+
+            mv = moves.next();
+        }
+
+        // 探索ループを抜けた後
+        if (legal_moves_played == 0) {
+            // 1手も指せなかった ＝ 詰まされている（またはステールメイト）
+            return -(INF - ply); 
         }
 
         uint32_t key = static_cast<uint32_t>(hash >> 32); 
