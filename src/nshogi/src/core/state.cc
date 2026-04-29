@@ -14,6 +14,8 @@
 
 #include <cassert>
 #include <cstring>
+#include <string.h>
+#include <iostream>
 
 namespace nshogi {
 namespace core {
@@ -83,6 +85,14 @@ void State::doMove(Move32 Move) noexcept {
 
 void State::undoMove() {
     Impl->undoMove();
+}
+
+void State::doNullMove() noexcept {
+    Impl->doNullMove();
+}
+
+void State::undoNullMove() {
+    Impl->undoNullMove();
 }
 
 RepetitionStatus State::getRepetitionStatus(bool Strict) const noexcept {

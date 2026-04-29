@@ -158,9 +158,10 @@ struct DirtyPiece
 };
 
 struct alignas(64) StateInfo{
-    alignas(32) int16_t acc[nshogi::core::NumColors][256];
+    alignas(64) int16_t acc[nshogi::core::NumColors][256];
 
-    uint64_t zobristKey;
+    // uint64_t zobristKey;
+    // hashはnshogi側で管理
 };
 
 class StatewithNNUE {
@@ -194,13 +195,6 @@ public:
             init();
         }
 
-    void doMove(const nshogi::core::Move32& M){
-        using namespace nshogi::core;
-        Color C = state.getSideToMove();
-        if(C == Black) doMove<Black>(M);
-        else           doMove<White>(M);
-    }
-
     template <nshogi::core::Color Us>
     void doMove(const nshogi::core::Move32& M){
         using namespace nshogi::core;
@@ -225,9 +219,29 @@ public:
         }
     }
 
+    void doMove(const nshogi::core::Move32& M){
+        using namespace nshogi::core;
+        Color C = state.getSideToMove();
+        if(C == Black) doMove<Black>(M);
+        else           doMove<White>(M);
+    }
+
     void undoMove(){
         st--;
         state.undoMove();
+    }
+
+    void doNullMove(){
+        StateInfo* prev_info = st;
+        st++;
+        *st = *prev_info;
+
+        state.doNullMove();
+    }
+
+    void undoNullMove(){
+        st--;
+        state.undoNullMove();
     }
 
     inline constexpr PieceId PieceTypeKindToPieceId(const PieceTypeKind type){

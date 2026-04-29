@@ -101,6 +101,9 @@ class State {
     ///
     void undoMove();
 
+    void doNullMove() noexcept;
+    void undoNullMove();
+
     ///
     /// @brief Get the repetition status of the state.
     /// @param Strict If false, detecting one repeated position is sufficient.

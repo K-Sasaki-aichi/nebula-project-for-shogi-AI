@@ -19,11 +19,10 @@ CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O3
 LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static
 #LDFLAGS  += -pg
 
-USI_TARGET ?= nebula_2_0.exe
+USI_TARGET ?= nebula_2_5.exe
 USI_SRCS := \
 	engine/usi.cpp \
 	engine/search.cpp \
-	engine/StatewithNNUE.cpp \
 	engine/nn/nnue_nn.cpp \
 	model/weights.cpp \
 	book/book.cpp

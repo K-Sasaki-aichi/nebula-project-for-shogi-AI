@@ -15,6 +15,9 @@ namespace engine
 {
     // オーバーフローを防ぐための安全な無限大
     constexpr int16_t INF = 30000;
+    
+    // NMP いつまで行うか
+    constexpr int R = 3; 
 
     // 探索結果を格納する構造体
     struct SearchResult {
@@ -60,11 +63,8 @@ namespace engine
         return alpha;
     }
 
-    template<nshogi::core::Color C, bool allow_null>
+    template<nshogi::core::Color C, bool allow_null = true>
     int16_t negamax(nnue::StatewithNNUE& st, int depth, int16_t alpha, int16_t beta, int age, int ply){
-        // オーバーフローを防ぐため、安全な値をINFとする
-        constexpr int INF = 30000;
-
         int16_t oriAlpha = alpha;
         auto &state = st.getState();
         const auto repetition = state.getRepetitionStatus();
@@ -96,12 +96,15 @@ namespace engine
             return tt_score;
         }
 
-
         // NMP
-        if constexpr(allow_null){
-            
+        if (!st.isInCheck() && depth > R && allow_null){
+            st.doNullMove();
+            int16_t score = -negamax<Oppo, false>(st, depth-1-R, -beta, -beta+1, age, ply+1);
+            st.undoNullMove();
+            if(score >= beta) {
+                return score;
+            }
         }
-
 
         // TTから前回の最善手を取得
         nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
