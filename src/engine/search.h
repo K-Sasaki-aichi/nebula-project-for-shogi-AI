@@ -95,13 +95,17 @@ namespace engine
         if(TT.hasUseHash(entry, hash, depth, alpha, beta, &tt_score)) {
             return tt_score;
         }
+    
+        // 1. NMPのための静的評価値チェック（TTにスコアがあればそれを使う実装に拡張も可能）
+        int16_t static_eval = st.eval<C>();
 
         // NMP
-        if (!st.isInCheck() && depth > R && allow_null){
+        if (!st.isInCheck() && depth > R && allow_null && static_eval >= beta){
             st.doNullMove();
             int16_t score = -negamax<Oppo, false>(st, depth-1-R, -beta, -beta+1, age, ply+1);
             st.undoNullMove();
             if(score >= beta) {
+                TT.store(hash, nshogi::core::Move32::MoveNone(), score, 0, depth, BOUND_LOWER, age);
                 return score;
             }
         }
