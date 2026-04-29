@@ -10,7 +10,7 @@ class TranspositionTable{
 
     public:
         TranspositionTable() {
-            resize(1024*4); // デフォルトで1GB確保
+            resize(1024*2); // デフォルトで1GB確保
         }
         void resize(size_t size_mb) {
             // 16バイト(sizeof(TTEntry)) で割って、何個のエントリが入るか計算
