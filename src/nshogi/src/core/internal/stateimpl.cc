@@ -14,8 +14,6 @@
 
 #include <cassert>
 #include <cstring>
-#include <string.h>
-#include <iostream>
 
 namespace nshogi {
 namespace core {
@@ -336,12 +334,6 @@ void StateImpl::refresh() noexcept {
 void StateImpl::doNullMove() noexcept {
     // This function must not be called when the king is in check.
     assert(getCheckerBB().isZero());
-
-    // --- デバッグ出力 (Null Move前) ---
-        Color C = getPosition().sideToMove();
-        std::cout << "info string " << "before:" 
-                << (int)Helper.getStepHelper(Helper.Ply).DefendingOpponentSliderBB[C].popCount() 
-                << std::endl;
                 
     Helper.proceedOneStep(Move32::MoveNone(), HashValue.getValue(),
                             getPosition().getStand<Black>(),
@@ -349,12 +341,6 @@ void StateImpl::doNullMove() noexcept {
 
     // Reset continuous check counts as the null move is not a checking move.
     StepHelper* CurrentStepHelper = &Helper.SHelper[Helper.Ply];
-
-    // --- デバッグ出力 (Null Move後・修正前ならここが0になる) ---
-        std::cout << "info string " <<  "after:" 
-              << (int)CurrentStepHelper->DefendingOpponentSliderBB[C].popCount() 
-              << std::endl;
-
 
     CurrentStepHelper->ContinuousCheckCounts[Black] = 0;
     CurrentStepHelper->ContinuousCheckCounts[White] = 0;
