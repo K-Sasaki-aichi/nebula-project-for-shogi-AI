@@ -83,29 +83,105 @@ namespace engine
     }
 #endif
 
-    template<bool isQsearch>
+    template <bool isQsearch>
     class MovePicker
     {
     public:
         MovePicker(const ::nshogi::core::State &state, const OrderingInfo &info)
-            : state_(state), info_(info) 
+            : state_(state), info_(info)
         {
-            ensureInitialized_();
         }
 
         MovePicker(const ::nshogi::core::State &state, ::nshogi::core::Move32 hashMove)
             : state_(state)
         {
             info_.hashMove = hashMove;
-            ensureInitialized_();
         }
 
         ::nshogi::core::Move32 next()
         {
-            const auto mv = getNextMove_();
-            if (mv.isNone())
-                return nshogi::core::Move32::MoveNone();
-            return mv;
+            while (stage_ != Stage::Done)
+            {
+                switch (stage_)
+                {
+                case Stage::TTMove:
+                    stage_ = Stage::GenerateCaptures;
+                    if (!info_.hashMove.isNone())
+                    {
+                        if constexpr (isQsearch)
+                        {
+                            if (isTactical_(info_.hashMove))
+                                return info_.hashMove;
+                        }
+                        else
+                        {
+                            return info_.hashMove;
+                        }
+                    }
+                    break;
+
+                case Stage::GenerateCaptures:
+                    generateCaptures_();
+                    stage_ = Stage::YieldCaptures;
+                    break;
+
+                case Stage::YieldCaptures:
+                {
+                    const auto mv = pickHighestScoreMove_();
+                    if (!mv.isNone())
+                    {
+                        if (!info_.hashMove.isNone() && mv == info_.hashMove)
+                            continue;
+                        return mv;
+                    }
+
+                    if constexpr (isQsearch)
+                    {
+                        stage_ = Stage::Done;
+                    }
+                    else
+                    {
+                        stage_ = Stage::Killers;
+                    }
+                    break;
+                }
+
+                case Stage::Killers:
+                    stage_ = Stage::GenerateQuiets;
+                    if (!info_.killer1.isNone() && info_.killer1 != info_.hashMove && !isCapture_(info_.killer1))
+                        return info_.killer1;
+                    if (!info_.killer2.isNone() && info_.killer2 != info_.hashMove && info_.killer2 != info_.killer1 && !isCapture_(info_.killer2))
+                        return info_.killer2;
+                    break;
+
+                case Stage::GenerateQuiets:
+                    generateQuiets_();
+                    stage_ = Stage::YieldQuiets;
+                    break;
+
+                case Stage::YieldQuiets:
+                {
+                    const auto mv = pickHighestScoreMove_();
+                    if (!mv.isNone())
+                    {
+                        if (!info_.hashMove.isNone() && mv == info_.hashMove)
+                            continue;
+                        if (!info_.killer1.isNone() && mv == info_.killer1)
+                            continue;
+                        if (!info_.killer2.isNone() && mv == info_.killer2)
+                            continue;
+                        return mv;
+                    }
+                    stage_ = Stage::Done;
+                    break;
+                }
+
+                case Stage::Done:
+                    break;
+                }
+            }
+
+            return ::nshogi::core::Move32::MoveNone();
         }
 
     private:
@@ -121,6 +197,11 @@ namespace engine
         {
             using namespace ::nshogi::core;
             return mv.capturePieceType() != PTK_Empty;
+        }
+
+        static constexpr bool isTactical_(const ::nshogi::core::Move32 &mv) noexcept
+        {
+            return isCapture_(mv) || mv.promote();
         }
 
         int scoreCapture_(const ::nshogi::core::Move32 &mv) const noexcept
@@ -144,24 +225,7 @@ namespace engine
             return score;
         }
 
-        int scoreMove_(const ::nshogi::core::Move32 &mv) const noexcept
-        {
-            if (!info_.hashMove.isNone() && mv == info_.hashMove)
-                return 1'000'000;
-
-            if (!info_.killer1.isNone() && mv == info_.killer1)
-                return 400'000;
-                
-            if (!info_.killer2.isNone() && mv == info_.killer2)
-                return 399'000;
-
-            if (isCapture_(mv))
-                return 500'000 + scoreCapture_(mv);
-
-            return 0;
-        }
-
-        ::nshogi::core::Move32 getNextMove_() noexcept
+        ::nshogi::core::Move32 pickHighestScoreMove_() noexcept
         {
             if (index_ >= count_)
                 return ::nshogi::core::Move32::MoveNone();
@@ -184,37 +248,79 @@ namespace engine
             return moves_[index_++].move;
         }
 
-
-        void ensureInitialized_()
+        void generateCaptures_()
         {
-            if (initialized_)
-                return;
+            count_ = 0;
+            index_ = 0;
 
-            if constexpr(isQsearch){
-                const auto legalMoves = ::nshogi::core::MoveGenerator::generateLegalCaptureMoves(state_);
-                for (const auto mv : legalMoves)
-                {
-                    // if (count_ >= MaxMoves) break; // 念のための安全装置
-                    moves_[count_++] = ScoredMove{mv, scoreMove_(mv)};
-                }
-            } else {
-                // 全合法手の生成とスコアリング
+            if constexpr (isQsearch)
+            {
+                // qsearchでは「駒取り + 駒を取らない成り」も入れないと手こぼれし得る。
                 const auto legalMoves = ::nshogi::core::MoveGenerator::generateLegalMoves(state_);
                 for (const auto mv : legalMoves)
                 {
-                    // if (count_ >= MaxMoves) break;
-                    moves_[count_++] = ScoredMove{mv, scoreMove_(mv)};
+                    if (count_ >= MaxMoves)
+                        break;
+                    if (!isTactical_(mv))
+                        continue;
+                    moves_[count_++] = ScoredMove{mv, 500'000 + scoreCapture_(mv) + highPromotionBonus(mv)};
                 }
             }
-
-            initialized_ = true;
+            else
+            {
+                // 通常探索ではまず駒取りだけを高速に列挙（成りで駒を取らない手は quiet 側で拾う）。
+                const auto captureMoves = ::nshogi::core::MoveGenerator::generateLegalCaptureMoves(state_);
+                for (const auto mv : captureMoves)
+                {
+                    if (count_ >= MaxMoves)
+                        break;
+                    moves_[count_++] = ScoredMove{mv, 500'000 + scoreCapture_(mv) + highPromotionBonus(mv)};
+                }
+            }
         }
+
+        void generateQuiets_()
+        {
+            count_ = 0;
+            index_ = 0;
+
+            const auto legalMoves = ::nshogi::core::MoveGenerator::generateLegalMoves(state_);
+            for (const auto mv : legalMoves)
+            {
+                if (count_ >= MaxMoves)
+                    break;
+
+                // 駒取りは capture フェーズで扱う。駒を取らない成りは quiet として残す。
+                if (isCapture_(mv))
+                    continue;
+
+                if (!info_.hashMove.isNone() && mv == info_.hashMove)
+                    continue;
+                if (!info_.killer1.isNone() && mv == info_.killer1)
+                    continue;
+                if (!info_.killer2.isNone() && mv == info_.killer2)
+                    continue;
+
+                moves_[count_++] = ScoredMove{mv, 0};
+            }
+        }
+
+        enum class Stage
+        {
+            TTMove,
+            GenerateCaptures,
+            YieldCaptures,
+            Killers,
+            GenerateQuiets,
+            YieldQuiets,
+            Done
+        };
 
     private:
         const ::nshogi::core::State &state_;
         OrderingInfo info_{};
 
-        bool initialized_ = false;
+        Stage stage_ = Stage::TTMove;
         ScoredMove moves_[MaxMoves] = {};
         ::std::size_t count_ = 0;
         ::std::size_t index_ = 0;
