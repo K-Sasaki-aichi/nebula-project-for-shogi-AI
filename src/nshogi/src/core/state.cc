@@ -113,6 +113,14 @@ bool State::isAttacked(Color C, Square Sq) const noexcept {
     }
 }
 
+bool State::isLegalMove(Color C, Move32 Move) const noexcept {
+    if(C == Black) {
+        return Impl->isLegalMove<Black>(Move);
+    } else {
+        return Impl->isLegalMove<White>(Move);
+    }
+}
+
 Square State::getKingSquare(Color C) const noexcept {
     return Impl->getKingSquare(C);
 }

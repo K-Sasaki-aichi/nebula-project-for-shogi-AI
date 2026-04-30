@@ -14,7 +14,7 @@ namespace engine
     // 引数を StatewithNNUE の参照に変更します
     SearchResult searchNNUE(nnue::StatewithNNUE &st)
     {
-        resetKillers();
+        initKillers();
         using nshogi::core::Black;
         using nshogi::core::White;
 

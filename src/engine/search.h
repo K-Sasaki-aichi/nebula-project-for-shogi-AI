@@ -44,7 +44,7 @@ namespace engine
         return k;
     }();
 
-    inline void resetKillers() noexcept
+    inline void initKillers() noexcept
     {
         for (auto &p : killers)
         {

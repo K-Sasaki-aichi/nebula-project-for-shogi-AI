@@ -773,6 +773,10 @@ class StateImpl {
 
     void undoNullMove();
 
+    template <Color C>
+    bool isLegalMove(Move32 Move) noexcept;
+
+
  protected:
     Position Pos;
     StateHelper Helper;

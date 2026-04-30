@@ -123,6 +123,11 @@ class State {
     bool isAttacked(Color C, Square Sq) const noexcept;
 
     ///
+    /// @brief Return true if the move is legal.
+    ///
+    bool isLegalMove(Color C, Move32 Move) const noexcept;
+
+    ///
     /// @brief Get the square location of the king piece.
     /// @param C The color of the king.
     ///

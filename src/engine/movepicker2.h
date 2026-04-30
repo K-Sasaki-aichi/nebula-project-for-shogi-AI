@@ -111,12 +111,13 @@ namespace engine
     {
     public:
         MovePicker2(const ::nshogi::core::State &state, const OrderingInfo &info)
-            : state_(state), info_(info)
+            : state_(state), info_(info), C_(state.getSideToMove())
         {
+            is_in_check_ = state_.isInCheck();
         }
 
         MovePicker2(const ::nshogi::core::State &state, ::nshogi::core::Move32 hashMove)
-            : state_(state)
+            : state_(state), C_(state.getSideToMove())
         {
             info_.hashMove = hashMove;
             is_in_check_ = state_.isInCheck();
@@ -193,9 +194,13 @@ namespace engine
                 case Stage::Killers:
                 {
                     stage_ = Stage::GenerateQuiets;
-                    if (!info_.killer1.isNone() && info_.killer1 != info_.hashMove && !isCapture_(info_.killer1))
+                    if(is_in_check_) break;
+                    // !isCapture_(info_.killer1) は isLegalMoveで判定済みなので消去
+                    if (!info_.killer1.isNone() && info_.killer1 != info_.hashMove && 
+                        state_.isLegalMove(C_, info_.killer1))
                         return info_.killer1;
-                    if (!info_.killer2.isNone() && info_.killer2 != info_.hashMove && info_.killer2 != info_.killer1 && !isCapture_(info_.killer2))
+                    if (!info_.killer2.isNone() && info_.killer2 != info_.hashMove && 
+                        info_.killer2 != info_.killer1 && state_.isLegalMove(C_, info_.killer2))
                         return info_.killer2;
                     break;
                 }
@@ -380,6 +385,7 @@ namespace engine
         const ::nshogi::core::State &state_;
         OrderingInfo info_{};
         bool is_in_check_ = false;
+        const::nshogi::core::Color C_;
 
         Stage stage_ = Stage::TTMove;
 
