@@ -101,9 +101,6 @@ class State {
     ///
     void undoMove();
 
-    void doNullMove() noexcept;
-    void undoNullMove();
-
     ///
     /// @brief Get the repetition status of the state.
     /// @param Strict If false, detecting one repeated position is sufficient.
@@ -116,11 +113,6 @@ class State {
     /// @brief Return true if the king of the current turn is in check.
     ///
     bool isInCheck() const noexcept;
-
-    ///
-    /// @brief Return true if the square is attacked by the specified color.
-    ///
-    bool isAttacked(Color C, Square Sq) const noexcept;
 
     ///
     /// @brief Get the square location of the king piece.

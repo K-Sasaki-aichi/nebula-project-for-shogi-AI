@@ -334,7 +334,8 @@ void StateImpl::refresh() noexcept {
 void StateImpl::doNullMove() noexcept {
     // This function must not be called when the king is in check.
     assert(getCheckerBB().isZero());
-    Helper.proceedOneStep(Move32::MoveNone(), HashValue.getValue(),
+
+    Helper.proceedOneStep(Move32::MoveNull(), HashValue.getValue(),
                             getPosition().getStand<Black>(),
                             getPosition().getStand<White>());
 
@@ -344,6 +345,7 @@ void StateImpl::doNullMove() noexcept {
 
     CurrentStepHelper->ContinuousCheckCounts[Black] = 0;
     CurrentStepHelper->ContinuousCheckCounts[White] = 0;
+    CurrentStepHelper->CheckerBB.clear();
 
     CurrentStepHelper->DefendingOpponentSliderBB[Black] = PrevStepHelper.DefendingOpponentSliderBB[Black];
     CurrentStepHelper->DefendingOpponentSliderBB[White] = PrevStepHelper.DefendingOpponentSliderBB[White];
@@ -353,7 +355,7 @@ void StateImpl::doNullMove() noexcept {
 
 void StateImpl::undoNullMove() {
     assert(getPly(false) > 0);
-    assert(getLastMove().isNone());
+    assert(getLastMove().isNull());
 
     Helper.goBackOneStep();
     Pos.changeSideToMove();
