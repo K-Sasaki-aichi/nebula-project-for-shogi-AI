@@ -85,6 +85,14 @@ void State::undoMove() {
     Impl->undoMove();
 }
 
+void State::doNullMove() noexcept {
+    Impl->doNullMove();
+}
+
+void State::undoNullMove() {
+    Impl->undoNullMove();
+}
+
 RepetitionStatus State::getRepetitionStatus(bool Strict) const noexcept {
     if (Strict) {
         return Impl->getRepetitionStatus<true>();
@@ -95,6 +103,14 @@ RepetitionStatus State::getRepetitionStatus(bool Strict) const noexcept {
 
 bool State::isInCheck() const noexcept {
     return !Impl->getCheckerBB().isZero();
+}
+
+bool State::isAttacked(Color C, Square Sq) const noexcept {
+    if (C == Black) {
+        return Impl->isAttacked<Black>(Sq);
+    } else {
+        return Impl->isAttacked<White>(Sq);
+    }
 }
 
 Square State::getKingSquare(Color C) const noexcept {
