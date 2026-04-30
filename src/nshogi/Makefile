@@ -44,7 +44,7 @@ ifeq ($(BUILD), debug)
 	OPTIM = -g3
 else
 	CXX_FLAGS = -std=c++20 -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fomit-frame-pointer -fno-stack-protector -fno-rtti -flto -DNDEBUG -pipe
-	# CXX_FLAGS = -std=c++20 -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fno-omit-frame-pointer -flto -pipe
+	# CXX_FLAGS = -std=c++20 -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fno-omit-frame-pointer -flto -fuse-ld=lld -pipe
 	PYTHON_CXX_FLAGS = -std=c++20 -Wall -Wextra -Wconversion -Wpedantic -Wshadow -fomit-frame-pointer -fno-stack-protector -flto -DNDEBUG -pipe
 	OPTIM = -O3 -ffast-math
 endif
@@ -55,7 +55,6 @@ SOURCES :=                                 \
 	src/core/position.cc               \
 	src/core/positionbuilder.cc        \
 	src/core/state.cc                  \
-    src/core/extendedstate.cc          \
 	src/core/statebuilder.cc           \
 	src/core/movegenerator.cc          \
 	src/core/huffman.cc                \

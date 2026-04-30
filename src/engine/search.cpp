@@ -33,16 +33,12 @@ namespace engine
         const int age = st.getPly();
         int16_t tt_score;
 
-        for(int i = 1; i <= depth; i++){
+        for(int i = 0; i < depth; i++){
             int16_t alpha = -INF - 1;
 
             nshogi::core::Move32 tt_move = result.bestMove; 
             TTEntry* entry = TT.probe(hash);
             if (tt_move == nshogi::core::Move32::MoveNone() && TT.isHit(entry, hash)) {
-                tt_move = entry->move;
-            }
-
-            if (TT.isHit(entry, hash)) { 
                 tt_move = entry->move;
             }
 
@@ -55,7 +51,7 @@ namespace engine
             case Black:
                 while(mv != nshogi::core::Move32::MoveNone()){
                     st.doMove<Black>(mv);    
-                    int16_t score = -negamax<White>(st, i-1, -INF, -alpha, age, 0);    
+                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0);    
                     st.undoMove();
                     
                     if (score > alpha) {
@@ -72,7 +68,7 @@ namespace engine
             default:
                 while(mv != nshogi::core::Move32::MoveNone()){
                     st.doMove<White>(mv);    
-                    int16_t score = -negamax<Black>(st, i-1, -INF, -alpha, age, 0);    
+                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0);    
                     st.undoMove();
                     
                     if (score > alpha) {

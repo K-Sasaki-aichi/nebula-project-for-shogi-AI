@@ -14,8 +14,6 @@
 
 #include <cassert>
 #include <cstring>
-#include <string.h>
-#include <iostream>
 
 namespace nshogi {
 namespace core {
