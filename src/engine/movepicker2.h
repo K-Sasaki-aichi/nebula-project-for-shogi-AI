@@ -178,10 +178,15 @@ namespace engine
                     }
 
                     if constexpr (isQsearch) {
-                        stage_ = Stage::Done;
+                        if (is_in_check_) {
+                            stage_ = Stage::Killers;
+                        } else {
+                            stage_ = Stage::Done;
+                        }
                     } else {
                         stage_ = Stage::Killers;
                     }
+                    
                     break;
                 }
 

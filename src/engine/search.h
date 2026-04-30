@@ -30,38 +30,58 @@ namespace engine
 
     template<nshogi::core::Color C>
     int16_t qsearch(nnue::StatewithNNUE& st, int depth, int16_t alpha, int16_t beta){
-        int16_t stand_pat = nnue::eval::eval<C>(st);
-        if(stand_pat >= beta){
-            return stand_pat;
-        }
-        if(stand_pat > alpha){
-            alpha = stand_pat;
+        bool in_check = st.isInCheck();
+        
+        int16_t best = -INF - 1;
+
+        // 王手されていない時のみ stand_pat の評価とカットを行う
+        if (!in_check) {
+            int16_t stand_pat = st.eval<C>(); // または nnue::eval::eval<C>(st)
+            if(stand_pat >= beta){
+                return stand_pat;
+            }
+            alpha = std::max(alpha, stand_pat);
+            best = stand_pat;
         }
 
         if (depth == 0) {
-            return alpha;
+            return in_check ? alpha : best;
         }
 
         auto &state = st.getState();
         MovePicker2<true> moves(state, nshogi::core::Move32::MoveNone());
 
+        int legal_moves_played = 0;
         auto mv = moves.next();
         while(mv != nshogi::core::Move32::MoveNone()){
             st.doMove<C>(mv);
             int16_t score = -qsearch<~C>(st, depth-1, -beta, -alpha);
             st.undoMove();
             
-            if(score >= beta){
-                return score;
+            legal_moves_played++;
+
+            // より良いスコアを見つけたら best を更新する（ここを追加！）
+            if (score > best) {
+                best = score;
             }
-            if(score > alpha){
-                alpha = score;
+
+            // ベータカット (Fail-Soft)
+            if(best >= beta){
+                return best;
             }
+            
+            alpha = std::max(alpha, best);
 
             mv = moves.next();
         }
 
-        return alpha;
+        // 王手されていて、合法な回避手が1つもなかった場合は「詰み」
+        if (in_check && legal_moves_played == 0) {
+            return -INF; // 探索深さ(ply)の概念がqsearchにはないので固定の負けスコアを返す
+        }
+
+        // alpha ではなく、実際に見つけたベストスコアを返す
+        return best;
     }
 
     template<nshogi::core::Color C, bool allow_null = true>
