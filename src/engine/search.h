@@ -7,6 +7,7 @@
 #include "eval.h"
 #include "TT.h"
 #include "movepicker.h"
+#include "movepicker2.h"
 #include <algorithm>
 #include <vector>
 #include <limits>
@@ -42,7 +43,7 @@ namespace engine
         }
 
         auto &state = st.getState();
-        MovePicker<true> moves(state, nshogi::core::Move32::MoveNone());
+        MovePicker2<true> moves(state, nshogi::core::Move32::MoveNone());
 
         auto mv = moves.next();
         while(mv != nshogi::core::Move32::MoveNone()){
@@ -116,7 +117,7 @@ namespace engine
             tt_move = entry->move;
         }
 
-        MovePicker<false> moves(state, tt_move);
+        MovePicker2<false> moves(state, tt_move);
 
         int legal_moves_played = 0;
 

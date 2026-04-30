@@ -42,7 +42,7 @@ namespace engine
                 tt_move = entry->move;
             }
 
-            MovePicker<false> moves(st.getState(), tt_move);
+            MovePicker2<false> moves(st.getState(), tt_move);
 
             auto mv = moves.next();
 

@@ -118,6 +118,11 @@ class State {
     bool isInCheck() const noexcept;
 
     ///
+    /// @brief Return true if the square is attacked by the specified color.
+    ///
+    bool isAttacked(Color C, Square Sq) const noexcept;
+
+    ///
     /// @brief Get the square location of the king piece.
     /// @param C The color of the king.
     ///
