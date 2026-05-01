@@ -127,6 +127,8 @@ class State {
     ///
     bool isLegalMove(Color C, Move32 Move) const noexcept;
 
+    bool isLegalQuietMove(Color C, Move32 Move) const noexcept;
+
     ///
     /// @brief Get the square location of the king piece.
     /// @param C The color of the king.

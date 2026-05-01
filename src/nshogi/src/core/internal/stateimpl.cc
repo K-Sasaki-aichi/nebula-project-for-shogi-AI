@@ -424,7 +424,7 @@ bool StateImpl::canDeclare() const noexcept {
 }
 
 template <Color C>
-bool StateImpl::isLegalMove(Move32 Move) noexcept {
+bool StateImpl::isLegalQuietMove(Move32 Move) noexcept {
     const Square To = Move.to();
     const PieceTypeKind Type = Move.pieceType();
     
@@ -461,7 +461,8 @@ bool StateImpl::isLegalMove(Move32 Move) noexcept {
     if (Type == PTK_Lance || Type == PTK_Bishop || Type == PTK_ProBishop || 
         Type == PTK_Rook  || Type == PTK_ProRook) {
         const bitboard::Bitboard OccupiedBB = getBitboard<Black>() | getBitboard<White>();
-        return (bitboard::getBetweenBB(From, To) & OccupiedBB).isZero();
+        if (!(bitboard::getBetweenBB(From, To) & OccupiedBB).isZero())
+            return false;
     }
 
     // 玉の自殺手チェック
@@ -476,6 +477,61 @@ bool StateImpl::isLegalMove(Move32 Move) noexcept {
     return true;
 }
 
+template <Color C>
+bool StateImpl::isLegalMove(Move32 Move) noexcept {
+    const Square To = Move.to();
+    const PieceTypeKind Type = Move.pieceType();
+    
+    //////////////////////////
+    // 打ち手の処理
+    /////////////////////////
+    if(Move.drop()){
+        if(getPosition().pieceOn(To) != PK_Empty) return false;
+        if(getStandCount<C>(Type) == 0) return false;
+
+        // 二歩チェック (関数呼び出しの () を追加)
+        if(Type == PTK_Pawn && 
+            !(getBitboard<C, PTK_Pawn>() & bitboard::FileBB[squareToFile(To)]).isZero())
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    /////////////////////////
+    // 盤上の駒の処理
+    /////////////////////////
+    const Square From = Move.from();
+
+    // 移動前の確認と移動後の空白の確認
+    if(getPosition().pieceOn(From) != makePiece(C, Type)) return false;
+
+    const PieceTypeKind CaptureType = Move.capturePieceType();
+    const PieceKind ExpectedTarget = (CaptureType == PTK_Empty) ? PK_Empty : makePiece(~C, CaptureType);
+    if(getPosition().pieceOn(To) != ExpectedTarget) return false;
+
+    if (Type == PTK_Lance || Type == PTK_Bishop || Type == PTK_ProBishop || 
+        Type == PTK_Rook  || Type == PTK_ProRook) {
+        const bitboard::Bitboard OccupiedBB = getBitboard<Black>() | getBitboard<White>();
+        if (!(bitboard::getBetweenBB(From, To) & OccupiedBB).isZero())
+            return false;
+    }
+
+    // 玉の自殺手チェック
+    if(Type == PTK_King && isAttacked<C>(To)) return false;
+
+    // ピンのチェック
+    const bitboard::Bitboard PinnedBB = getDefendingOpponentSliderBB<C>();
+    if(PinnedBB.isSet(From) && !bitboard::LineBB[getKingSquare<C>()][From].isSet(To)){
+        return false;
+    }
+
+    return true;
+}
+
+
+
 template void StateImpl::doMove<Black>(Move32 Move) noexcept;
 template void StateImpl::doMove<White>(Move32 Move) noexcept;
 template void StateImpl::undoMove<Black>();
@@ -483,6 +539,8 @@ template void StateImpl::undoMove<White>();
 
 template bool StateImpl::isLegalMove<Black>(Move32 Move) noexcept;
 template bool StateImpl::isLegalMove<White>(Move32 Move) noexcept;
+template bool StateImpl::isLegalQuietMove<Black>(Move32 Move) noexcept;
+template bool StateImpl::isLegalQuietMove<White>(Move32 Move) noexcept;
 
 } // namespace internal
 } // namespace core

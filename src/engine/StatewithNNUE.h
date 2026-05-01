@@ -178,7 +178,7 @@ private:
 
 public:
     void init(){
-        stateStack.resize(256);
+        stateStack.resize(MAX_PLY);
         st = &stateStack[0];
 
         refresh_acc<nshogi::core::White>();
@@ -231,7 +231,7 @@ public:
         state.undoMove();
     }
 
-    void doNullMove(){
+    void doNullMove() noexcept {
         StateInfo* prev_info = st;
         st++;
         *st = *prev_info;
@@ -239,7 +239,7 @@ public:
         state.doNullMove();
     }
 
-    void undoNullMove(){
+    void undoNullMove() noexcept {
         st--;
         state.undoNullMove();
     }
@@ -337,7 +337,7 @@ public:
             case 3:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 3);  [[fallthrough]];
             case 2:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 2);  [[fallthrough]];
             case 1:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 1);  [[fallthrough]];
-            case 0:  break;
+            case 0:  active_indices[local_num++] = KingSqId + getCapturedIndex<IsSameColor>(type, 0); break;
         }
     }
 

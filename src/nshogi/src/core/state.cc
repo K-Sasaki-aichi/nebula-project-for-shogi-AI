@@ -113,6 +113,14 @@ bool State::isAttacked(Color C, Square Sq) const noexcept {
     }
 }
 
+bool State::isLegalQuietMove(Color C, Move32 Move) const noexcept {
+    if(C == Black) {
+        return Impl->isLegalQuietMove<Black>(Move);
+    } else {
+        return Impl->isLegalQuietMove<White>(Move);
+    }
+}
+
 bool State::isLegalMove(Color C, Move32 Move) const noexcept {
     if(C == Black) {
         return Impl->isLegalMove<Black>(Move);

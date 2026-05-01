@@ -164,15 +164,14 @@ namespace engine
         int16_t static_eval = st.eval<C>();
 
         // NMP
-        // if (!st.isInCheck() && depth > R && allow_null && static_eval >= beta){
-        //     st.doNullMove();
-        //     int16_t score = -negamax<Oppo, false>(st, depth-1-R, -beta, -beta+1, age, ply+1);
-        //     st.undoNullMove();
-        //     if(score >= beta) {
-        //         TT.store(hash, nshogi::core::Move32::MoveNone(), score, 0, depth, BOUND_LOWER, age);
-        //         return score;
-        //     }
-        // }
+        if (!st.isInCheck() && depth > R && allow_null && static_eval >= beta){
+            st.doNullMove();
+            int16_t score = -negamax<Oppo, false>(st, depth-1-R, -beta, -beta+1, age, ply+1);
+            st.undoNullMove();
+            if(score >= beta) {
+                return score;
+            }
+        }
 
         // TTから前回の最善手を取得
         nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
@@ -183,6 +182,7 @@ namespace engine
 
         engine::OrderingInfo info{};
         info.hashMove = tt_move;
+        
         if (0 <= ply && ply < engine::MaxPly)
         {
             info.killer1 = engine::killers[ply][0];

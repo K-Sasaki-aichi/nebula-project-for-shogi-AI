@@ -776,6 +776,9 @@ class StateImpl {
     template <Color C>
     bool isLegalMove(Move32 Move) noexcept;
 
+    template <Color C>
+    bool isLegalQuietMove(Move32 Move) noexcept;
+
 
  protected:
     Position Pos;

@@ -131,16 +131,13 @@ namespace engine
                 {
                 case Stage::TTMove:
                 {
+                    using namespace nshogi::core;
                     stage_ = Stage::GenerateCaptures;
-                    if (!info_.hashMove.isNone())
+                    if (!info_.hashMove.isNone() && state_.isLegalMove(C_, info_.hashMove))
                     {
-                        if constexpr (isQsearch)
-                        {
-                            if (isTactical_(info_.hashMove))
-                                return info_.hashMove;
-                        }
-                        else
-                        {
+                        if constexpr (isQsearch) {
+                            if (isTactical_(info_.hashMove)) return info_.hashMove;
+                        } else {
                             return info_.hashMove;
                         }
                     }
