@@ -223,12 +223,35 @@ namespace engine
         MovePicker2<false> moves(state, info);
 
         int legal_moves_played = 0;
+        bool is_in_check = st.isInCheck();
 
         auto mv = moves.next();
         while (mv != nshogi::core::Move32::MoveNone())
         {
             st.doMove<C>(mv);
-            int16_t score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1);
+
+            int16_t score;
+
+            const bool is_capture = (mv.capturePieceType() != nshogi::core::PTK_Empty);
+            const bool is_promotion = mv.promote();
+
+            // 簡易LMR
+            if(depth >= 3 && legal_moves_played >= 3 && !is_capture && !is_promotion && !is_in_check){
+                int reduction = 1;
+                
+                if(legal_moves_played >= 6) reduction = 2;
+
+                // 浅く探索する (depth - 1 - reduction)
+                score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1);
+
+                // もし浅く読んだ結果が Alpha を超えた場合はフル計算
+                if (score > alpha) {
+                    score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1);
+                }
+            } else {
+                score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1);
+            }
+
             st.undoMove();
 
             legal_moves_played++;
@@ -238,6 +261,7 @@ namespace engine
                 best = score;
                 best_move = mv;
             }
+            
             alpha = std::max(alpha, best);
             if (alpha >= beta)
             {

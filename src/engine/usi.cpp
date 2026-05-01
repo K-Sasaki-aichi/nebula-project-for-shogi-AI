@@ -383,7 +383,7 @@ int main()
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_debug_3.1.1");
+            writeLine("id name nebula_debug_lmr");
             writeLine("id author Sasaki, Horiuchi");
             writeLine("usiok");
             continue;

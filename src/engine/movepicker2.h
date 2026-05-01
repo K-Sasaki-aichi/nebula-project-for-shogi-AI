@@ -76,35 +76,35 @@ namespace engine
     };
 
 #if __has_include("engine/TT.h")
-    inline ::nshogi::core::Move32 hash_move(const ::nshogi::core::State &state,
-                                            ::engine::TranspositionTable &tt) noexcept
-    {
-        const uint64_t hash = state.getHash();
-        const ::TTEntry *entry = tt.probe(hash);
-        ::nshogi::core::Move32 move;
+    // inline ::nshogi::core::Move32 hash_move(const ::nshogi::core::State &state,
+    //                                         ::engine::TranspositionTable &tt) noexcept
+    // {
+    //     const uint64_t hash = state.getHash();
+    //     const ::TTEntry *entry = tt.probe(hash);
+    //     ::nshogi::core::Move32 move;
 
-        tt.isHit(entry, hash, move);
+    //     tt.isHit(entry, hash, move);
 
-        return move;
-    }
+    //     return move;
+    // }
 
-    inline OrderingInfo makeOrderingInfoFromTT(const ::nshogi::core::State &state,
-                                               ::engine::TranspositionTable &tt) noexcept
-    {
-        OrderingInfo info{};
-        info.hashMove = hash_move(state, tt);
-        return info;
-    }
+    // inline OrderingInfo makeOrderingInfoFromTT(const ::nshogi::core::State &state,
+    //                                            ::engine::TranspositionTable &tt) noexcept
+    // {
+    //     OrderingInfo info{};
+    //     info.hashMove = hash_move(state, tt);
+    //     return info;
+    // }
 
-    inline ::nshogi::core::Move32 hash_move(const ::nshogi::core::State &state) noexcept
-    {
-        return hash_move(state, ::engine::TT);
-    }
+    // inline ::nshogi::core::Move32 hash_move(const ::nshogi::core::State &state) noexcept
+    // {
+    //     return hash_move(state, ::engine::TT);
+    // }
 
-    inline OrderingInfo makeOrderingInfoFromTT(const ::nshogi::core::State &state) noexcept
-    {
-        return makeOrderingInfoFromTT(state, ::engine::TT);
-    }
+    // inline OrderingInfo makeOrderingInfoFromTT(const ::nshogi::core::State &state) noexcept
+    // {
+    //     return makeOrderingInfoFromTT(state, ::engine::TT);
+    // }
 #endif
 
     template <bool isQsearch>
