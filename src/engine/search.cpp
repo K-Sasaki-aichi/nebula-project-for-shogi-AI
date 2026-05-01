@@ -7,12 +7,37 @@
 
 #include <atomic>
 #include <cstdint>
+#include <thread>
+#include <vector>
 
 namespace engine
 {
     TranspositionTable TT;
 
     std::atomic<bool> isStop(false);
+
+    void helperThreadWorker(nnue::StatewithNNUE root_st, int thread_id, int target_depth){
+        using nshogi::core::Black;
+        using nshogi::core::White;
+
+        const int depth = target_depth+3;
+        const int INF = 30000;
+
+        const auto side = root_st.getSideToMove();
+        const int age = root_st.getPly();
+
+        // 探索の多様化: スレッドごとに開始深さを変える (Lazy SMP の定石)
+        int start_depth = 1 + (thread_id % 4);
+
+        for(int i = start_depth; i < depth; i++){
+            if(side == Black){
+                negamax<Black>(root_st, i, -INF, INF, age, 0);
+            } else {
+                negamax<White>(root_st, i, -INF, INF, age, 0);
+            }
+        }
+    }
+
 
     // 引数を StatewithNNUE の参照に変更します
     SearchResult searchNNUE(nnue::StatewithNNUE &st)
@@ -23,6 +48,7 @@ namespace engine
 
         const int depth = 7;
         const int INF = 30000;
+        const int NUM_THREADS= 6;
         SearchResult result;
 
         const uint64_t hash = st.getHash();
@@ -31,6 +57,15 @@ namespace engine
         {
             result.bestMove = b_move;
             return result;
+        }
+
+        isStop.store(false);
+        std::vector<std::thread> threads;
+
+        for(int i = 0; i < NUM_THREADS; i++){
+            threads.push_back(std::thread([st, i, depth]() {
+                helperThreadWorker(st, i, depth);
+            }));
         }
 
         const auto side = st.getSideToMove();
@@ -109,6 +144,11 @@ namespace engine
 
             // 反復深化の1つの深さ(i)の探索が終わった直後
             TT.store(hash, result.bestMove, result.score, 0, i, BOUND_EXACT, age);
+        }
+
+        isStop.store(true);
+        for(auto& t : threads) {
+            if(t.joinable()) t.join();
         }
 
         return result;
