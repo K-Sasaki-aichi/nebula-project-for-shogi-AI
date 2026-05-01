@@ -29,17 +29,38 @@ class TranspositionTable{
             return &table[hashVal & mask];
         }
 
-        inline bool isHit(const TTEntry* entry, uint64_t hash) const {
-            return entry->key == static_cast<uint32_t>(hash >> 32);
+        inline bool isHit(const TTEntry* entry, uint64_t hash, nshogi::core::Move32& outMove) const {
+            outMove = nshogi::core::Move32::MoveNone();
+            const uint32_t expectedKey = static_cast<uint32_t>(hash >> 32);
+
+            const uint32_t k1 = entry->key;
+            if(expectedKey != k1) return false;
+
+            TTEntry e = *entry;
+
+            const uint32_t k2 = entry->key;
+            if(k2 != k1) return false;
+
+            outMove = e.move;
+            return true;
         }
 
         inline bool hasUseHash(const TTEntry* entry, uint64_t hash, int depth, int16_t alpha, int16_t beta, int16_t* tt_score) const {
-            if(!isHit(entry, hash)) return false;
+            const uint32_t expectedKey = static_cast<uint32_t>(hash >> 32);
 
-            if (entry->depth < depth) return false;
+            const uint32_t key = entry->key;
+            if(expectedKey != key) return false;
 
-            *tt_score = entry->score;
-            Bound bound = entry->getBound();
+            // 安全のためにコピー
+            TTEntry e = *entry;
+
+            // ダブルチェック. 書き込まれがないかのチェック
+            if(key != entry->key || key != expectedKey) return false;
+
+            if (e.depth < depth) return false;
+
+            *tt_score = e.score;
+            Bound bound = e.getBound();
 
             return (bound == BOUND_EXACT)
                     || (bound == BOUND_LOWER && *tt_score >= beta)

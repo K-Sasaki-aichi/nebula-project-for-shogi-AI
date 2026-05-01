@@ -81,10 +81,11 @@ namespace engine
     {
         const uint64_t hash = state.getHash();
         const ::TTEntry *entry = tt.probe(hash);
-        if (!tt.isHit(entry, hash))
-            return ::nshogi::core::Move32::MoveNone();
+        ::nshogi::core::Move32 move;
 
-        return entry->move;
+        tt.isHit(entry, hash, move);
+
+        return move;
     }
 
     inline OrderingInfo makeOrderingInfoFromTT(const ::nshogi::core::State &state,

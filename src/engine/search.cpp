@@ -39,8 +39,8 @@ namespace engine
 
             nshogi::core::Move32 tt_move = result.bestMove; 
             TTEntry* entry = TT.probe(hash);
-            if (tt_move == nshogi::core::Move32::MoveNone() && TT.isHit(entry, hash)) {
-                tt_move = entry->move;
+            if (tt_move == nshogi::core::Move32::MoveNone()) {
+                TT.isHit(entry, hash, tt_move);
             }
 
             MovePicker2<false> moves(st.getState(), tt_move);

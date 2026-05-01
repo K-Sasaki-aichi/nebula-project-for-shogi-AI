@@ -174,11 +174,8 @@ namespace engine
         }
 
         // TTから前回の最善手を取得
-        nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
-        if (TT.isHit(entry, hash))
-        {
-            tt_move = entry->move;
-        }
+        nshogi::core::Move32 tt_move;
+        TT.isHit(entry, hash, tt_move);
 
         engine::OrderingInfo info{};
         info.hashMove = tt_move;

@@ -34,11 +34,11 @@
 
         // 書き込み用
         inline void save(uint32_t k, nshogi::core::Move32 m, int16_t s, int16_t e, uint8_t d, Bound b, uint8_t age) {
-            key = k;
             move = m;
             score = s;
             eval = e;
             depth = d;
             bound_age = (age << 2) | b;
+            key = k;
         }
     };
