@@ -16,24 +16,28 @@ namespace engine
 
     std::atomic<bool> isStop(false);
 
-    void helperThreadWorker(nnue::StatewithNNUE root_st, int thread_id, int target_depth){
+    void helperThreadWorker(nshogi::core::State cloned_st, int thread_id, int target_depth){
         using nshogi::core::Black;
         using nshogi::core::White;
+
+        nnue::StatewithNNUE st(std::move(cloned_st));
 
         const int depth = target_depth+3;
         const int INF = 30000;
 
-        const auto side = root_st.getSideToMove();
-        const int age = root_st.getPly();
+        const auto side = st.getSideToMove();
+        const int age = st.getPly();
 
         // 探索の多様化: スレッドごとに開始深さを変える (Lazy SMP の定石)
         int start_depth = 1 + (thread_id % 4);
 
         for(int i = start_depth; i < depth; i++){
+            if (isStop.load(std::memory_order_relaxed)) break;
+
             if(side == Black){
-                negamax<Black>(root_st, i, -INF, INF, age, 0);
+                negamax<Black>(st, i, -INF, INF, age, 0);
             } else {
-                negamax<White>(root_st, i, -INF, INF, age, 0);
+                negamax<White>(st, i, -INF, INF, age, 0);
             }
         }
     }
@@ -48,7 +52,7 @@ namespace engine
 
         const int depth = 7;
         const int INF = 30000;
-        const int NUM_THREADS= 6;
+        const int NUM_THREADS= 5;
         SearchResult result;
 
         const uint64_t hash = st.getHash();
@@ -63,9 +67,7 @@ namespace engine
         std::vector<std::thread> threads;
 
         for(int i = 0; i < NUM_THREADS; i++){
-            threads.push_back(std::thread([st, i, depth]() {
-                helperThreadWorker(st, i, depth);
-            }));
+            threads.push_back(std::thread(helperThreadWorker, st.getState().clone(), i, depth));
         }
 
         const auto side = st.getSideToMove();
@@ -150,6 +152,8 @@ namespace engine
         for(auto& t : threads) {
             if(t.joinable()) t.join();
         }
+
+        isStop.store(false);
 
         return result;
     }

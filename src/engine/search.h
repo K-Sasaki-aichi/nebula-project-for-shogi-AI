@@ -96,7 +96,12 @@ namespace engine
 
             st.doMove<C>(mv);
             int16_t score = -qsearch<~C>(st, depth - 1, -beta, -alpha);
+            
             st.undoMove();
+
+            if (isStop.load(std::memory_order_relaxed)) {
+                return 0; // スコアを比較せず、すぐに抜ける
+            }
 
             legal_moves_played++;
 
@@ -197,7 +202,13 @@ namespace engine
         {
             st.doNullMove();
             int16_t score = -negamax<Oppo, false>(st, depth - 1 - R, -beta, -beta + 1, age, ply + 1);
+
             st.undoNullMove();
+
+            if (isStop.load(std::memory_order_relaxed)) {
+                return 0; // スコアを比較せず、すぐに抜ける
+            }
+            
             if (score >= beta)
             {
                 return score;
@@ -245,14 +256,18 @@ namespace engine
                 score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1);
 
                 // もし浅く読んだ結果が Alpha を超えた場合はフル計算
-                if (score > alpha) {
+                if (!isStop.load(std::memory_order_relaxed) && score > alpha) {
                     score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1);
-                }
+                } 
             } else {
                 score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1);
             }
 
             st.undoMove();
+
+            if (isStop.load(std::memory_order_relaxed)) {
+                return 0; // スコアを比較せず、すぐに抜ける
+            }
 
             legal_moves_played++;
 
@@ -261,7 +276,7 @@ namespace engine
                 best = score;
                 best_move = mv;
             }
-            
+        
             alpha = std::max(alpha, best);
             if (alpha >= beta)
             {

@@ -388,12 +388,12 @@ namespace engine
         Stage stage_ = Stage::TTMove;
 
         // 駒取り用の配列
-        ScoredMove captures_[MaxMoves] = {};
+        ScoredMove captures_[MaxMoves];
         ::std::size_t cap_count_ = 0;
         ::std::size_t cap_idx_ = 0;
 
         // Quiet（駒を取らない手）用の配列
-        ScoredMove quiets_[MaxMoves] = {};
+        ScoredMove quiets_[MaxMoves];
         ::std::size_t quiet_count_ = 0;
         ::std::size_t quiet_idx_ = 0;
     };
