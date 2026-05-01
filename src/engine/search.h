@@ -14,6 +14,9 @@
 
 namespace engine
 {
+    // 探索の終了を知らせるフラグ
+    extern std::atomic<bool> isStop;
+
     // オーバーフローを防ぐための安全な無限大
     constexpr int16_t INF = 30000;
 
@@ -84,6 +87,11 @@ namespace engine
         auto mv = moves.next();
         while (mv != nshogi::core::Move32::MoveNone())
         {
+            // isStop = true なら探索を終了
+            if(isStop.lead(std::memory_order_relaxed)){
+                return 0;
+            }
+
             st.doMove<C>(mv);
             int16_t score = -qsearch<~C>(st, depth - 1, -beta, -alpha);
             st.undoMove();
@@ -154,10 +162,22 @@ namespace engine
 
         int16_t tt_score;
         const uint64_t hash = st.getHash();
-        TTEntry *entry = TT.probe(hash);
-        if (TT.hasUseHash(entry, hash, depth, alpha, beta, &tt_score))
-        {
-            return tt_score;
+        TTEntry entry;
+
+        if (TT.read(hash, entry)) {
+            if (entry.depth >= depth) {
+                int16_t tt_score = entry.score;
+                Bound bound = entry.getBound();
+
+                if (bound == BOUND_EXACT)
+                    return tt_score;
+
+                if (bound == BOUND_LOWER && tt_score >= beta)
+                    return tt_score;
+
+                if (bound == BOUND_UPPER && tt_score <= alpha)
+                    return tt_score;
+            }
         }
 
         // 1. NMPのための静的評価値チェック（TTにスコアがあればそれを使う実装に拡張も可能）
@@ -174,8 +194,10 @@ namespace engine
         }
 
         // TTから前回の最善手を取得
-        nshogi::core::Move32 tt_move;
-        TT.isHit(entry, hash, tt_move);
+        nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
+        if (TT.read(hash, entry)) {
+            tt_move = entry.move;
+        }
 
         engine::OrderingInfo info{};
         info.hashMove = tt_move;

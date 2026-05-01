@@ -5,11 +5,14 @@
 #include "../../nshogi/src/core/types.h"
 #include "../book/book.h"
 
+#include <atomic>
 #include <cstdint>
 
 namespace engine
 {
     TranspositionTable TT; 
+
+    std::atomic<bool> isStop(false);
 
     // 引数を StatewithNNUE の参照に変更します
     SearchResult searchNNUE(nnue::StatewithNNUE &st)
@@ -38,9 +41,11 @@ namespace engine
             int16_t alpha = -INF - 1;
 
             nshogi::core::Move32 tt_move = result.bestMove; 
-            TTEntry* entry = TT.probe(hash);
-            if (tt_move == nshogi::core::Move32::MoveNone()) {
-                TT.isHit(entry, hash, tt_move);
+
+            TTEntry entry;
+
+            if (tt_move == nshogi::core::Move32::MoveNone() && TT.read(hash, entry)) {
+                tt_move = entry.move;
             }
 
             MovePicker2<false> moves(st.getState(), tt_move);
