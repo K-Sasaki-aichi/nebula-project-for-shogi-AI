@@ -3,7 +3,7 @@
 #include "../nshogi/src/core/state.h"
 #include "../nshogi/src/core/statebuilder.h"
 #include "../nshogi/src/io/sfen.h"
-#include "StatewithNNUE.h" 
+#include "StatewithNNUE.h"
 #include "../model/weights.h"
 #include "../book/book.h"
 
@@ -13,18 +13,32 @@
 #include <cstdint>
 #include <exception>
 #include <iostream>
+#include <atomic>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #endif
 
 namespace
 {
+
+    std::mutex g_usi_io_mutex;
+
+    void writeLine(const std::string &line)
+    {
+        std::lock_guard<std::mutex> lock(g_usi_io_mutex);
+        std::cout << line << std::endl;
+    }
 
 #if defined(_WIN32)
     void setCwdToExecutableDir()
@@ -61,7 +75,45 @@ namespace
 
     void sendInfoString(const std::string &msg)
     {
-        std::cout << "info string " << msg << std::endl;
+        writeLine("info string " + msg);
+    }
+
+    struct SearchController
+    {
+        std::thread worker;
+        std::atomic<bool> pondering{false};
+        std::atomic<bool> finished{false};
+        std::atomic<bool> bestmove_sent{false};
+
+        // guarded by g_usi_io_mutex
+        std::string bestmove = "resign";
+    };
+
+    SearchController g_search;
+
+    void stopAndJoinSearchThreadIfAny()
+    {
+        engine::isStop.store(true, std::memory_order_relaxed);
+        if (g_search.worker.joinable())
+        {
+            g_search.worker.join();
+        }
+    }
+
+    void sendBestmoveOnceFromStored()
+    {
+        bool expected = false;
+        if (!g_search.bestmove_sent.compare_exchange_strong(expected, true))
+        {
+            return;
+        }
+
+        std::string best;
+        {
+            std::lock_guard<std::mutex> lock(g_usi_io_mutex);
+            best = g_search.bestmove;
+        }
+        writeLine("bestmove " + best);
     }
 
     struct EngineContext
@@ -105,14 +157,17 @@ namespace
 
         // book.h で定義した loadBook を呼び出す
         // ファイルが見つからない等のエラー処理は loadBook 内で行う想定
-        try {
+        try
+        {
             loadBook("book/book2.bin");
             ctx.book_loaded = true;
             std::cerr << "[usi] Book loaded." << std::endl;
-        } catch (const std::exception &e) {
+        }
+        catch (const std::exception &e)
+        {
             std::cerr << "[usi] Book load failed: " << e.what() << std::endl;
             // 失敗しても探索はできるので、フラグだけ立てて何度も読みに行かないようにする
-            ctx.book_loaded = true; 
+            ctx.book_loaded = true;
         }
     }
 
@@ -160,7 +215,7 @@ namespace
                 throw std::runtime_error("position sfen: insufficient tokens");
             }
             const std::string sfen = tokens[i + 1] + " " + tokens[i + 2] + " " + tokens[i + 3] + " " + tokens[i + 4];
-            
+
             // nshogi::core::State を生成し、StatewithNNUE(nshogi::core::State&&) コンストラクタにムーブして渡す
             ctx.state.emplace(nshogi::io::sfen::StateBuilder::newState(sfen));
             i += 5;
@@ -201,15 +256,22 @@ namespace
         for (std::size_t i = 1; i < tokens.size();)
         {
             const auto &key = tokens[i];
-            if (i + 1 >= tokens.size()) break;
+            if (i + 1 >= tokens.size())
+                break;
             const auto &val = tokens[i + 1];
 
-            if (key == "btime") btime = std::stoi(val);
-            else if (key == "wtime") wtime = std::stoi(val);
-            else if (key == "binc") binc = std::stoi(val);
-            else if (key == "winc") winc = std::stoi(val);
-            else if (key == "byoyomi") byoyomi = std::stoi(val);
-            else if (key == "movetime") movetime = std::stoi(val);
+            if (key == "btime")
+                btime = std::stoi(val);
+            else if (key == "wtime")
+                wtime = std::stoi(val);
+            else if (key == "binc")
+                binc = std::stoi(val);
+            else if (key == "winc")
+                winc = std::stoi(val);
+            else if (key == "byoyomi")
+                byoyomi = std::stoi(val);
+            else if (key == "movetime")
+                movetime = std::stoi(val);
 
             i += 2;
         }
@@ -236,28 +298,69 @@ namespace
 
         ensureNNUEWeightsLoaded(ctx);
 
-        std::string bestmove;
-        if (ctx.nnue_weights_loaded)
+        // 二重起動防止: 既存探索があれば止めて待つ
+        stopAndJoinSearchThreadIfAny();
+
+        // フラグ初期化
+        engine::isStop.store(false, std::memory_order_relaxed);
+        g_search.finished.store(false, std::memory_order_relaxed);
+        g_search.bestmove_sent.store(false, std::memory_order_relaxed);
+
         {
-            // searchNNUE は nnue::StatewithNNUE& を受け取る想定
-            const auto result = engine::searchNNUE(*ctx.state);
-            if (result.bestMove.isNone())
+            std::lock_guard<std::mutex> lock(g_usi_io_mutex);
+            g_search.bestmove = "resign";
+        }
+
+        bool ponder = false;
+        for (const auto &t : tokens)
+        {
+            if (t == "ponder")
             {
-                bestmove = "resign";
+                ponder = true;
+                break;
+            }
+        }
+        g_search.pondering.store(ponder, std::memory_order_relaxed);
+
+        ensureState(ctx);
+        const std::string sfen_snapshot = nshogi::io::sfen::stateToSfen(ctx.state->getState());
+        const bool weights_loaded = ctx.nnue_weights_loaded;
+
+        g_search.worker = std::thread([sfen_snapshot, weights_loaded]()
+                                      {
+            std::string best = "resign";
+
+            if (weights_loaded)
+            {
+                nnue::StatewithNNUE local_state(nshogi::io::sfen::StateBuilder::newState(sfen_snapshot));
+                const auto result = engine::searchNNUE(local_state);
+                if (!result.bestMove.isNone())
+                {
+                    best = nshogi::io::sfen::move32ToSfen(result.bestMove);
+                }
             }
             else
             {
-                bestmove = nshogi::io::sfen::move32ToSfen(result.bestMove);
-                std::cout << "info depth " << result.depth << " score cp " << result.score 
-                          << " pv " << bestmove << std::endl;
+                const auto st = nshogi::io::sfen::StateBuilder::newState(sfen_snapshot);
+                const auto moves = nshogi::core::MoveGenerator::generateLegalMoves(st);
+                if (moves.size() != 0)
+                {
+                    best = nshogi::io::sfen::move32ToSfen(moves[0]);
+                }
             }
-        }
-        else
-        {
-            bestmove = pickBestmoveSfen(ctx);
-        }
 
-        std::cout << "bestmove " << bestmove << std::endl;
+            {
+                std::lock_guard<std::mutex> lock(g_usi_io_mutex);
+                g_search.bestmove = best;
+            }
+            g_search.finished.store(true, std::memory_order_relaxed);
+
+            // ponder中は出力せず保持。通常goならここでbestmoveを出す(1回だけ)。
+            if (!g_search.pondering.load(std::memory_order_relaxed) &&
+                !engine::isStop.load(std::memory_order_relaxed))
+            {
+                sendBestmoveOnceFromStored();
+            } });
     }
 
 } // namespace
@@ -273,15 +376,16 @@ int main()
     for (std::string line; std::getline(std::cin, line);)
     {
         const auto tokens = splitTokens(line);
-        if (tokens.empty()) continue;
+        if (tokens.empty())
+            continue;
 
         const auto &cmd = tokens[0];
 
         if (cmd == "usi")
         {
-            std::cout << "id name nebula_debug_3.1.1" << std::endl;
-            std::cout << "id author Sasaki, Horiuchi" << std::endl;
-            std::cout << "usiok" << std::endl;
+            writeLine("id name nebula_debug_3.1.1");
+            writeLine("id author Sasaki, Horiuchi");
+            writeLine("usiok");
             continue;
         }
 
@@ -289,38 +393,69 @@ int main()
         {
             ensureNNUEWeightsLoaded(ctx);
             ensureBookLoaded(ctx);
-            std::cout << "readyok" << std::endl;
+            writeLine("readyok");
             continue;
         }
 
-        if (cmd == "setoption") continue;
+        if (cmd == "setoption")
+            continue;
 
         if (cmd == "usinewgame")
         {
+            stopAndJoinSearchThreadIfAny();
             ctx.state.emplace(); // 初期局面でアキュムレータを初期化
             continue;
         }
 
         if (cmd == "position")
         {
-            try { handlePosition(ctx, tokens); }
-            catch (const std::exception &e) { sendInfoString(std::string("position parse error: ") + e.what()); }
+            try
+            {
+                handlePosition(ctx, tokens);
+            }
+            catch (const std::exception &e)
+            {
+                sendInfoString(std::string("position parse error: ") + e.what());
+            }
             continue;
         }
 
         if (cmd == "go")
         {
-            try { handleGo(ctx, tokens); }
+            try
+            {
+                handleGo(ctx, tokens);
+            }
             catch (const std::exception &e)
             {
                 sendInfoString(std::string("go error: ") + e.what());
-                std::cout << "bestmove resign" << std::endl;
+                writeLine("bestmove resign");
             }
             continue;
         }
 
-        if (cmd == "stop") continue;
-        if (cmd == "quit") break;
+        if (cmd == "stop")
+        {
+            stopAndJoinSearchThreadIfAny();
+            sendBestmoveOnceFromStored();
+            continue;
+        }
+
+        if (cmd == "ponderhit")
+        {
+            g_search.pondering.store(false, std::memory_order_relaxed);
+            if (g_search.finished.load(std::memory_order_relaxed))
+            {
+                sendBestmoveOnceFromStored();
+            }
+            continue;
+        }
+
+        if (cmd == "quit")
+        {
+            stopAndJoinSearchThreadIfAny();
+            break;
+        }
     }
 
     return 0;

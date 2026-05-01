@@ -9,6 +9,7 @@
 // #include "movepicker.h"
 #include "movepicker2.h"
 #include <algorithm>
+#include <atomic>
 #include <vector>
 #include <limits>
 
@@ -88,7 +89,8 @@ namespace engine
         while (mv != nshogi::core::Move32::MoveNone())
         {
             // isStop = true なら探索を終了
-            if(isStop.lead(std::memory_order_relaxed)){
+            if (isStop.load(std::memory_order_relaxed))
+            {
                 return 0;
             }
 
@@ -148,6 +150,11 @@ namespace engine
             break;
         }
 
+        if (isStop.load(std::memory_order_relaxed))
+        {
+            return 0;
+        }
+
         if (depth == 0)
         {
             return qsearch<C>(st, 50, alpha, beta);
@@ -164,8 +171,10 @@ namespace engine
         const uint64_t hash = st.getHash();
         TTEntry entry;
 
-        if (TT.read(hash, entry)) {
-            if (entry.depth >= depth) {
+        if (TT.read(hash, entry))
+        {
+            if (entry.depth >= depth)
+            {
                 int16_t tt_score = entry.score;
                 Bound bound = entry.getBound();
 
@@ -184,24 +193,27 @@ namespace engine
         int16_t static_eval = st.eval<C>();
 
         // NMP
-        if (!st.isInCheck() && depth > R && allow_null && static_eval >= beta){
+        if (!st.isInCheck() && depth > R && allow_null && static_eval >= beta)
+        {
             st.doNullMove();
-            int16_t score = -negamax<Oppo, false>(st, depth-1-R, -beta, -beta+1, age, ply+1);
+            int16_t score = -negamax<Oppo, false>(st, depth - 1 - R, -beta, -beta + 1, age, ply + 1);
             st.undoNullMove();
-            if(score >= beta) {
+            if (score >= beta)
+            {
                 return score;
             }
         }
 
         // TTから前回の最善手を取得
         nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
-        if (TT.read(hash, entry)) {
+        if (TT.read(hash, entry))
+        {
             tt_move = entry.move;
         }
 
         engine::OrderingInfo info{};
         info.hashMove = tt_move;
-        
+
         if (0 <= ply && ply < engine::MaxPly)
         {
             info.killer1 = engine::killers[ply][0];

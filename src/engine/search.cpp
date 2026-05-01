@@ -10,7 +10,7 @@
 
 namespace engine
 {
-    TranspositionTable TT; 
+    TranspositionTable TT;
 
     std::atomic<bool> isStop(false);
 
@@ -27,8 +27,8 @@ namespace engine
 
         const uint64_t hash = st.getHash();
         const nshogi::core::Move32 b_move = findBookMove(hash);
-        if (!b_move.isNone()) {
-            std::cout << "info string book hit" << std::endl;
+        if (!b_move.isNone())
+        {
             result.bestMove = b_move;
             return result;
         }
@@ -37,14 +37,20 @@ namespace engine
         const int age = st.getPly();
         int16_t tt_score;
 
-        for(int i = 0; i < depth; i++){
+        for (int i = 0; i < depth; i++)
+        {
+            if (isStop.load(std::memory_order_relaxed))
+            {
+                break;
+            }
             int16_t alpha = -INF - 1;
 
-            nshogi::core::Move32 tt_move = result.bestMove; 
+            nshogi::core::Move32 tt_move = result.bestMove;
 
             TTEntry entry;
 
-            if (tt_move == nshogi::core::Move32::MoveNone() && TT.read(hash, entry)) {
+            if (tt_move == nshogi::core::Move32::MoveNone() && TT.read(hash, entry))
+            {
                 tt_move = entry.move;
             }
 
@@ -55,12 +61,18 @@ namespace engine
             switch (side)
             {
             case Black:
-                while(mv != nshogi::core::Move32::MoveNone()){
-                    st.doMove<Black>(mv);    
-                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0);    
+                while (mv != nshogi::core::Move32::MoveNone())
+                {
+                    if (isStop.load(std::memory_order_relaxed))
+                    {
+                        break;
+                    }
+                    st.doMove<Black>(mv);
+                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0);
                     st.undoMove();
-                    
-                    if (score > alpha) {
+
+                    if (score > alpha)
+                    {
                         alpha = score;
                         result.bestMove = mv;
                         result.score = score;
@@ -68,16 +80,22 @@ namespace engine
 
                     mv = moves.next();
                 }
-            
+
                 break;
-            
+
             default:
-                while(mv != nshogi::core::Move32::MoveNone()){
-                    st.doMove<White>(mv);    
-                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0);    
+                while (mv != nshogi::core::Move32::MoveNone())
+                {
+                    if (isStop.load(std::memory_order_relaxed))
+                    {
+                        break;
+                    }
+                    st.doMove<White>(mv);
+                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0);
                     st.undoMove();
-                    
-                    if (score > alpha) {
+
+                    if (score > alpha)
+                    {
                         alpha = score;
                         result.bestMove = mv;
                         result.score = score;
@@ -91,7 +109,6 @@ namespace engine
 
             // 反復深化の1つの深さ(i)の探索が終わった直後
             TT.store(hash, result.bestMove, result.score, 0, i, BOUND_EXACT, age);
-
         }
 
         return result;
