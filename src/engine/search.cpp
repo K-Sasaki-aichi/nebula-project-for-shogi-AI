@@ -80,9 +80,7 @@ namespace engine
 
                     mv = moves.next();
                 }
-
                 break;
-
             default:
                 while (mv != nshogi::core::Move32::MoveNone())
                 {
@@ -102,7 +100,6 @@ namespace engine
 
                     mv = moves.next();
                 }
-
                 break;
             }
 
@@ -122,18 +119,22 @@ namespace engine
         using nshogi::core::Black;
         using nshogi::core::White;
 
-        const int depth = 30;
+        const int depth = 40;
         const int INF = 30000;
         const int NUM_THREADS= 5;
         std::vector<ThreadData> threadData(NUM_THREADS);
         SearchResult result;
 
+        // 定跡
         const uint64_t hash = st.getHash();
-        const nshogi::core::Move32 b_move = findBookMove(hash);
-        if (!b_move.isNone())
-        {
-            result.bestMove = b_move;
-            return result;
+        
+        if(st.getPLY() <= 50){
+            const nshogi::core::Move32 b_move = findBookMove(hash);
+            if (!b_move.isNone())
+            {
+                result.bestMove = b_move;
+                return result;
+            }
         }
 
         isStop.store(false);
@@ -148,6 +149,10 @@ namespace engine
         const int age = st.getPly();
         int16_t tt_score;
         ThreadData& main_td = threadData[0];
+
+        nshogi::core::Move32 prev_best_move = nshogi::core::Move32::MoveNone();
+        int16_t prev_score = 0;
+        int stable_count = 0;
 
         for (int i = 0; i < depth; i++)
         {
@@ -235,6 +240,15 @@ namespace engine
             // 反復深化の1つの深さ(i)の探索が終わった直後
             TT.store(hash, result.bestMove, result.score, 0, i, BOUND_EXACT, age);
             //sharedBestMove.store(result.bestMove, std::memory_order_relaxed);
+
+            // 終了条件
+            if(prev_best_move == result.bestMove) stable_count++;
+            else                                  stable_count = 0;
+
+            if(i >= 5 && stable_count >= 3) break;
+
+            prev_best_move = result.bestMove;
+            prev_score = result.score;
         }
 
         isStop.store(true);

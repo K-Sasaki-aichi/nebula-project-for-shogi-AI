@@ -175,6 +175,7 @@ private:
 
     std::vector<StateInfo> stateStack;
     StateInfo* st;
+    int PLY = 0;
 
 public:
     void init(){
@@ -582,6 +583,7 @@ public:
     inline uint16_t getPly() const { return state.getPly(); }
     inline uint64_t getHash() { return state.getHash(); }
     inline bool isInCheck() const noexcept { return state.isInCheck(); }
+    inline int getPLY() const noexcept { return PLY; }
 };
 
 }//nnue
