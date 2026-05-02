@@ -170,7 +170,9 @@ namespace engine
                 res.bestMove = nshogi::core::Move32::MoveWin();
                 res.score = INF;
                 res.depth = 0;
-                
+
+                std::cout << "bestmove win"  << std::endl;
+                exit(0);
                 // 探索せずに即座に終わる！
                 return res; 
             }
