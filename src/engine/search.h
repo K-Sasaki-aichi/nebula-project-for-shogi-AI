@@ -36,6 +36,10 @@ namespace engine
         int32_t depth = 5;
     };
 
+    struct ThreadData {
+        uint64_t nodes = 0;
+    };
+
     inline constexpr int MaxPly = 128;
 
     using KillerMovePair = ::std::array<nshogi::core::Move32, 2>;
@@ -62,8 +66,9 @@ namespace engine
     }
 
     template <nshogi::core::Color C>
-    int16_t qsearch(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta)
+    int16_t qsearch(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, ThreadData& td)
     {
+        td.nodes++;
         bool in_check = st.isInCheck();
 
         int16_t best = -INF - 1;
@@ -99,7 +104,7 @@ namespace engine
             }
 
             st.doMove<C>(mv);
-            int16_t score = -qsearch<~C>(st, depth - 1, -beta, -alpha);
+            int16_t score = -qsearch<~C>(st, depth - 1, -beta, -alpha, td);
 
             st.undoMove();
 
@@ -138,8 +143,10 @@ namespace engine
     }
 
     template <nshogi::core::Color C, bool allow_null = true>
-    int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply)
+    int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply, ThreadData& td)
     {
+        td.nodes++;
+
         int16_t oriAlpha = alpha;
         auto &state = st.getState();
         const auto repetition = state.getRepetitionStatus();
@@ -167,7 +174,7 @@ namespace engine
 
         if (depth == 0)
         {
-            return qsearch<C>(st, 50, alpha, beta);
+            return qsearch<C>(st, 50, alpha, beta, td);
         }
 
         nshogi::core::Move32 best_move = nshogi::core::Move32::MoveNone();
@@ -207,7 +214,7 @@ namespace engine
         if (!st.isInCheck() && depth > R_adaptive && allow_null && static_eval >= beta)
         {
             st.doNullMove();
-            int16_t score = -negamax<Oppo, false>(st, depth - 1 - R, -beta, -beta + 1, age, ply + 1);
+            int16_t score = -negamax<Oppo, false>(st, depth - 1 - R, -beta, -beta + 1, age, ply + 1, td);
 
             st.undoNullMove();
 
@@ -263,17 +270,17 @@ namespace engine
                     reduction = 2;
 
                 // 浅く探索する (depth - 1 - reduction)
-                score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1);
+                score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1, td);
 
                 // もし浅く読んだ結果が Alpha を超えた場合はフル計算
                 if (!isStop.load(std::memory_order_relaxed) && score > alpha)
                 {
-                    score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1);
+                    score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1, td);
                 }
             }
             else
             {
-                score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1);
+                score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1, td);
             }
 
             st.undoMove();

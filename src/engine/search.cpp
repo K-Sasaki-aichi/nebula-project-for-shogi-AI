@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <thread>
 #include <vector>
+#include <chrono>
 
 namespace engine
 {
@@ -21,7 +22,7 @@ namespace engine
     //     nshogi::core::Move32::MoveNone()
     // };
 
-    void helperThreadWorker(nshogi::core::State cloned_st, int thread_id, int target_depth){
+    void helperThreadWorker(nshogi::core::State cloned_st, int thread_id, int target_depth, ThreadData& td){
         using nshogi::core::Black;
         using nshogi::core::White;
 
@@ -67,7 +68,7 @@ namespace engine
                     if (isStop.load(std::memory_order_relaxed)) return;
 
                     st.doMove<Black>(mv);
-                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0);
+                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0, td);
                     st.undoMove();
                     if (isStop.load(std::memory_order_relaxed)) return;
 
@@ -88,7 +89,7 @@ namespace engine
                     if (isStop.load(std::memory_order_relaxed)) return;
 
                     st.doMove<White>(mv);
-                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0);
+                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0, td);
                     st.undoMove();
 
                     if (isStop.load(std::memory_order_relaxed)) return;
@@ -121,9 +122,10 @@ namespace engine
         using nshogi::core::Black;
         using nshogi::core::White;
 
-        const int depth = 9;
+        const int depth = 30;
         const int INF = 30000;
         const int NUM_THREADS= 5;
+        std::vector<ThreadData> threadData(NUM_THREADS);
         SearchResult result;
 
         const uint64_t hash = st.getHash();
@@ -139,12 +141,13 @@ namespace engine
         // sharedBestMove.store(nshogi::core::Move32::MoveNone(), std::memory_order_relaxed);
 
         for(int i = 0; i < NUM_THREADS; i++){
-            threads.push_back(std::thread(helperThreadWorker, st.getState().clone(), i, depth));
+            threads.push_back(std::thread(helperThreadWorker, st.getState().clone(), i, depth, std::ref(threadData[i])));
         }
 
         const auto side = st.getSideToMove();
         const int age = st.getPly();
         int16_t tt_score;
+        ThreadData& main_td = threadData[0];
 
         for (int i = 0; i < depth; i++)
         {
@@ -183,7 +186,7 @@ namespace engine
                         break;
                     }
                     st.doMove<Black>(mv);
-                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0);
+                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0, main_td);
                     st.undoMove();
 
                     if (score > alpha)
@@ -206,7 +209,7 @@ namespace engine
                         break;
                     }
                     st.doMove<White>(mv);
-                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0);
+                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0, main_td);
                     st.undoMove();
 
                     if (score > alpha)

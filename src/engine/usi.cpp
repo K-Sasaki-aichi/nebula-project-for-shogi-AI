@@ -284,14 +284,20 @@ namespace
         const int my_inc = isBlack ? binc : winc;
 
         int think_time = 0;
-        if (movetime >= 0)
-        {
+        if (movetime >= 0) {
             think_time = movetime;
-        }
-        else
-        {
-            think_time = (my_time / 20) + my_inc + (byoyomi / 2);
-            think_time = std::max(think_time, 100);
+        } else {
+            think_time = (my_time / 30) + my_inc; 
+
+            // 最低思考時間（ご希望の x 秒）をここで保証
+            // 例：序盤でも最低 2秒は考えさせたい場合
+            int min_think_time = 500; 
+            think_time = std::max(think_time, min_think_time);
+
+            // 【重要】ただし、残り時間が少なくなった時に「残り時間以上」考えないように制限
+            // 残り時間の 80% を絶対上限にするなど
+            int absolute_limit = my_time * 0.8;
+            think_time = std::min(think_time, absolute_limit);
         }
 
         sendInfoString("think_time(ms)=" + std::to_string(think_time));
