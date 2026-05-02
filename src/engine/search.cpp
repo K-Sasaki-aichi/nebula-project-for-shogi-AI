@@ -263,7 +263,14 @@ namespace engine
         isStop.store(false);
 
         std::cout << "nodes:" << main_td.nodes << std::endl;
-        std::cout << "nps:" << main_td.nodes*1000/think_time << std::endl;
+        // think_time が 0 の場合に備える
+        if (think_time > 0) {
+            double nps = (double)main_td.nodes / ((double)think_time / 1000.0);
+            std::cout << "nps:" << (long long)nps << std::endl;
+        } else {
+            // 1ms未満の場合は測定不能として出すか、前回の値を出す
+            std::cout << "nps:0 (too fast)" << std::endl;
+        }
 
         return result;
     }
