@@ -119,7 +119,7 @@ namespace engine
         using nshogi::core::Black;
         using nshogi::core::White;
 
-        const int depth = 40;
+        const int depth = 8;
         const int INF = 30000;
         const int NUM_THREADS= 5;
         std::vector<ThreadData> threadData(NUM_THREADS);
