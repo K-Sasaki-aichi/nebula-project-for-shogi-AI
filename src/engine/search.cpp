@@ -207,13 +207,18 @@ namespace engine
             case Black:
                 while (mv != nshogi::core::Move32::MoveNone())
                 {
+                    // if (isStop.load(std::memory_order_relaxed))
+                    // {
+                    //     break;
+                    // }
+                    st.doMove<Black>(mv);
+                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0, main_td);
+                    st.undoMove();
+
                     if (isStop.load(std::memory_order_relaxed))
                     {
                         break;
                     }
-                    st.doMove<Black>(mv);
-                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0, main_td);
-                    st.undoMove();
 
                     if (score > alpha)
                     {
@@ -230,13 +235,17 @@ namespace engine
             default:
                 while (mv != nshogi::core::Move32::MoveNone())
                 {
+                    // if (isStop.load(std::memory_order_relaxed))
+                    // {
+                    //     break;
+                    // }
+                    st.doMove<White>(mv);
+                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0, main_td);
+                    st.undoMove();
                     if (isStop.load(std::memory_order_relaxed))
                     {
                         break;
                     }
-                    st.doMove<White>(mv);
-                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0, main_td);
-                    st.undoMove();
 
                     if (score > alpha)
                     {

@@ -103,10 +103,10 @@ namespace engine
         while (mv != nshogi::core::Move32::MoveNone())
         {
             // isStop = true なら探索を終了
-            if (isStop.load(std::memory_order_relaxed))
-            {
-                return 0;
-            }
+            // if (isStop.load(std::memory_order_relaxed))
+            // {
+            //     return alpha;
+            // }
 
             st.doMove<C>(mv);
             int16_t score = -qsearch<~C>(st, depth - 1, -beta, -alpha, td);
@@ -115,7 +115,7 @@ namespace engine
 
             if (isStop.load(std::memory_order_relaxed))
             {
-                return 0; // スコアを比較せず、すぐに抜ける
+                return alpha; // スコアを比較せず、すぐに抜ける
             }
 
             legal_moves_played++;
@@ -188,7 +188,7 @@ namespace engine
 
         if (isStop.load(std::memory_order_relaxed))
         {
-            return 0;
+            return alpha;
         }
 
         if (depth == 0)
@@ -250,7 +250,7 @@ namespace engine
 
             if (isStop.load(std::memory_order_relaxed))
             {
-                return 0; // スコアを比較せず、すぐに抜ける
+                return alpha; // スコアを比較せず、すぐに抜ける
             }
 
             if (score >= beta)
@@ -317,7 +317,7 @@ namespace engine
 
             if (isStop.load(std::memory_order_relaxed))
             {
-                return 0; // スコアを比較せず、すぐに抜ける
+                return alpha; // スコアを比較せず、すぐに抜ける
             }
 
             legal_moves_played++;
