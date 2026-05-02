@@ -34,6 +34,8 @@ namespace
 
     std::mutex g_usi_io_mutex;
 
+    int PLY;
+
     void writeLine(const std::string &line)
     {
         std::lock_guard<std::mutex> lock(g_usi_io_mutex);
@@ -202,6 +204,7 @@ namespace
     void applyMoveTokens(EngineContext &ctx, const std::vector<std::string> &tokens, std::size_t fromIndex)
     {
         ensureState(ctx);
+        PLY = tokens.size();
         for (std::size_t i = fromIndex; i < tokens.size(); ++i)
         {
             // sfenToMove32はPositionを要求するため、getPosition()を渡す
@@ -310,15 +313,18 @@ namespace
         }
         else
         {
-            think_time = (my_time / 40) + my_inc;
+            // 序盤（例: 30手未満）は 1/80 程度に抑え、中盤以降は 1/40 にする
+            int divisor = (PLY < 30) ? 80 : 40;
+            
+            // 基本の計算
+            think_time = (my_time / divisor) + my_inc; 
 
-            // 最低思考時間（ご希望の x 秒）をここで保証
-            // 例：序盤でも最低 2秒は考えさせたい場合
-            int min_think_time = 500;
+            // 3. 序盤の最低思考時間を短めに、中盤以降を長めにする調整
+            // 序盤は 500ms、中盤以降は 2000ms を保証するなど
+            int min_think_time = (PLY < 30) ? 500 : 2000;
             think_time = std::max(think_time, min_think_time);
 
-            // 【重要】ただし、残り時間が少なくなった時に「残り時間以上」考えないように制限
-            // 残り時間の 80% を絶対上限にするなど
+            // 4. 残り時間による絶対制限（時間切れ防止）
             int absolute_limit = my_time * 0.8;
             think_time = std::min(think_time, absolute_limit);
         }
