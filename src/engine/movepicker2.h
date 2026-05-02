@@ -111,14 +111,41 @@ namespace engine
     class MovePicker2
     {
     public:
+    // コンストラクタ1: thread_idなし (デフォルト0)
         MovePicker2(const ::nshogi::core::State &state, const OrderingInfo &info)
-            : state_(state), info_(info), C_(state.getSideToMove())
+            : state_(state), 
+              info_(info), 
+              C_(state.getSideToMove()), 
+              thread_id_(0) // 個別に初期化
         {
             is_in_check_ = state_.isInCheck();
         }
 
+        // コンストラクタ2: thread_idあり
+        MovePicker2(const ::nshogi::core::State &state, const OrderingInfo &info, int id)
+            : state_(state), 
+              info_(info), 
+              C_(state.getSideToMove()), 
+              thread_id_(id) // 個別に初期化
+        {
+            is_in_check_ = state_.isInCheck();
+        }
+
+        // コンストラクタ3: hashMoveのみ (thread_id 0)
         MovePicker2(const ::nshogi::core::State &state, ::nshogi::core::Move32 hashMove)
-            : state_(state), C_(state.getSideToMove())
+            : state_(state), 
+              C_(state.getSideToMove()), 
+              thread_id_(0) // constメンバなので必ず初期化が必要
+        {
+            info_.hashMove = hashMove;
+            is_in_check_ = state_.isInCheck();
+        }
+
+        // コンストラクタ4: hashMove + thread_id
+        MovePicker2(const ::nshogi::core::State &state, ::nshogi::core::Move32 hashMove, int id)
+            : state_(state), 
+              C_(state.getSideToMove()), 
+              thread_id_(id) // 個別に初期化
         {
             info_.hashMove = hashMove;
             is_in_check_ = state_.isInCheck();
@@ -365,6 +392,11 @@ namespace engine
 
                 quiets_[quiet_count_++] = ScoredMove{mv, 0};
             }
+
+            if (thread_id_ > 0 && quiet_count_ > 1) {
+                std::size_t shift = static_cast<std::size_t>(thread_id_) % quiet_count_;
+                std::rotate(quiets_, quiets_ + shift, quiets_ + quiet_count_);
+            } 
         }
 
         enum class Stage
@@ -396,6 +428,8 @@ namespace engine
         ScoredMove quiets_[MaxMoves];
         ::std::size_t quiet_count_ = 0;
         ::std::size_t quiet_idx_ = 0;
+
+        const int thread_id_;
     };
 
 } // namespace engine

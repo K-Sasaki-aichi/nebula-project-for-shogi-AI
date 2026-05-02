@@ -217,7 +217,7 @@ namespace engine
 
             if (score >= beta)
             {
-                return score;
+                return score >= 20000 ? beta : score;
             }
         }
 
@@ -332,6 +332,7 @@ namespace engine
 
         // 静的評価値(eval)は今度考える.
         TT.store(hash, best_move, best, 0, depth, bound, age);
+
         return best;
     }
 

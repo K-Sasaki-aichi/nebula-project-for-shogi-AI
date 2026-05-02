@@ -36,8 +36,9 @@ namespace engine
 
         // 探索の多様化: スレッドごとに開始深さを変える
         int start_depth = 1 + (thread_id % 4);
+        int step = 1 + (thread_id % 3);
 
-        for (int i = start_depth; i < depth; i++)
+        for (int i = start_depth; i < depth; i+=step)
         {
             if (isStop.load(std::memory_order_relaxed))
             {
@@ -54,7 +55,7 @@ namespace engine
                 tt_move = entry.move;
             }
 
-            MovePicker2<false> moves(st.getState(), tt_move);
+            MovePicker2<false> moves(st.getState(), tt_move, thread_id+1);
 
             auto mv = moves.next();
 
