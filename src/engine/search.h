@@ -17,10 +17,9 @@ namespace engine
 {
     // 探索の終了を知らせるフラグ
     extern std::atomic<bool> isStop;
-    
+
     // ベストの動きを共有する
     extern std::atomic<nshogi::core::Move32> sharedBestMove;
-
 
     // オーバーフローを防ぐための安全な無限大
     constexpr int16_t INF = 30000;
@@ -36,7 +35,8 @@ namespace engine
         int32_t depth = 5;
     };
 
-    struct ThreadData {
+    struct ThreadData
+    {
         uint64_t nodes = 0;
     };
 
@@ -66,7 +66,7 @@ namespace engine
     }
 
     template <nshogi::core::Color C>
-    int16_t qsearch(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, ThreadData& td)
+    int16_t qsearch(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, ThreadData &td)
     {
         td.nodes++;
         bool in_check = st.isInCheck();
@@ -143,7 +143,7 @@ namespace engine
     }
 
     template <nshogi::core::Color C, bool allow_null = true>
-    int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply, ThreadData& td)
+    int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply, ThreadData &td)
     {
         td.nodes++;
 
@@ -208,6 +208,17 @@ namespace engine
 
         // 1. NMPのための静的評価値チェック（TTにスコアがあればそれを使う実装に拡張も可能）
         int16_t static_eval = st.eval<C>();
+
+        // ▼▼▼ RFP (Reverse Futility Pruning) ▼▼▼
+        if (depth <= 2 && !st.isInCheck() && std::abs(static_eval) < 5000)
+        {
+            int margin = 200 * depth;
+            if (static_eval - margin >= beta)
+            {
+                return static_eval;
+            }
+        }
+        // ▲▲▲ RFP ▲▲▲
 
         // NMP
         int R_adaptive = 3 + depth / 6;
