@@ -351,7 +351,7 @@ namespace engine
         {
             // 1手も指せなかった ＝ 詰まされている（またはステールメイト）
             const auto lastMove = state.getLastMove();
-            if(lastMove.drop() && lastMove.pieceType() == PTK_Pawn){
+            if(lastMove.drop() && lastMove.pieceType() == nshogi::core::PTK_Pawn){
                 return INF - ply;
             }
             return -(INF - ply);
