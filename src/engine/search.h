@@ -179,6 +179,12 @@ namespace engine
         default:
             break;
         }
+        
+        // 宣言勝ち
+        if(state.canDeclare()){
+            return INF - ply;
+        }
+
 
         if (isStop.load(std::memory_order_relaxed))
         {
@@ -344,6 +350,10 @@ namespace engine
         if (legal_moves_played == 0)
         {
             // 1手も指せなかった ＝ 詰まされている（またはステールメイト）
+            const auto lastMove = state.getLastMove();
+            if(lastMove.drop() && lastMove.pieceType() == PTK_Pawn){
+                return INF - ply;
+            }
             return -(INF - ply);
         }
 

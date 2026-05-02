@@ -164,9 +164,15 @@ namespace engine
             {
                 break;
             }
-            if (isStop.load(std::memory_order_relaxed))
-            {
-                break;
+
+            if (st.getState().canDeclare()) {
+                SearchResult res;
+                res.bestMove = nshogi::core::Move32::MoveWin();
+                res.score = INF;
+                res.depth = 0;
+                
+                // 探索せずに即座に終わる！
+                return res; 
             }
 
             int16_t alpha = -INF;
