@@ -118,6 +118,26 @@ namespace
         writeLine("bestmove " + best);
     }
 
+    void tryPublishBestmove()
+    {
+        if (engine::isStop.load(std::memory_order_relaxed))
+        {
+            return;
+        }
+
+        if (g_search.pondering.load(std::memory_order_relaxed))
+        {
+            return;
+        }
+
+        if (!g_search.finished.load(std::memory_order_relaxed))
+        {
+            return;
+        }
+
+        sendBestmoveOnceFromStored();
+    }
+
     struct EngineContext
     {
         // nshogi::core::State から nnue::StatewithNNUE に変更
@@ -375,11 +395,9 @@ namespace
             g_search.finished.store(true, std::memory_order_relaxed);
 
             // ponder中は出力せず保持。通常goならここでbestmoveを出す(1回だけ)。
-            if (!g_search.pondering.load(std::memory_order_relaxed) &&
-                !engine::isStop.load(std::memory_order_relaxed))
+            if (!g_search.pondering.load(std::memory_order_relaxed))
             {
                 std::cout << "info depth " << depth << " score cp " << score << " pv " << best << std::endl;
-                sendBestmoveOnceFromStored();
             } });
     }
 
@@ -403,7 +421,7 @@ int main()
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_4.0");
+            writeLine("id name nebula_4.1");
             writeLine("id author Sasaki, Horiuchi");
             writeLine("usiok");
             continue;
@@ -464,10 +482,7 @@ int main()
         if (cmd == "ponderhit")
         {
             g_search.pondering.store(false, std::memory_order_relaxed);
-            if (g_search.finished.load(std::memory_order_relaxed))
-            {
-                sendBestmoveOnceFromStored();
-            }
+            tryPublishBestmove();
             continue;
         }
 
