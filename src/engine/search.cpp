@@ -123,7 +123,7 @@ namespace engine
 
         const int depth = 40;
         const int INF = 30000;
-        const int NUM_THREADS= 5;
+        const int NUM_THREADS= 6;
         std::vector<ThreadData> threadData(NUM_THREADS);
         SearchResult result;
 
@@ -263,6 +263,7 @@ namespace engine
         isStop.store(false);
 
         std::cout << "nodes:" << main_td.nodes << std::endl;
+        std::cout << "nps:" << main_td.nodes*1000/think_time << std::endl;
 
         return result;
     }

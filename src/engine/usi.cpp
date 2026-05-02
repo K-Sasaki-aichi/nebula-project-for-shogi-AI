@@ -313,8 +313,7 @@ namespace
         }
         else
         {
-            // 序盤（例: 30手未満）は 1/80 程度に抑え、中盤以降は 1/40 にする
-            int divisor = (PLY < 30) ? 80 : 40;
+            int divisor = (PLY < 30) ? 50 : 25;
             
             // 基本の計算
             think_time = (my_time / divisor) + my_inc; 
@@ -398,6 +397,7 @@ namespace
             if (!g_search.pondering.load(std::memory_order_relaxed))
             {
                 std::cout << "info depth " << depth << " score cp " << score << " pv " << best << std::endl;
+                sendBestmoveOnceFromStored();
             } });
     }
 
