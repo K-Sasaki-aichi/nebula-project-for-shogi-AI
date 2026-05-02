@@ -96,10 +96,11 @@ namespace engine
 
             st.doMove<C>(mv);
             int16_t score = -qsearch<~C>(st, depth - 1, -beta, -alpha);
-            
+
             st.undoMove();
 
-            if (isStop.load(std::memory_order_relaxed)) {
+            if (isStop.load(std::memory_order_relaxed))
+            {
                 return 0; // スコアを比較せず、すぐに抜ける
             }
 
@@ -205,10 +206,11 @@ namespace engine
 
             st.undoNullMove();
 
-            if (isStop.load(std::memory_order_relaxed)) {
+            if (isStop.load(std::memory_order_relaxed))
+            {
                 return 0; // スコアを比較せず、すぐに抜ける
             }
-            
+
             if (score >= beta)
             {
                 return score;
@@ -239,33 +241,40 @@ namespace engine
         auto mv = moves.next();
         while (mv != nshogi::core::Move32::MoveNone())
         {
+            const bool is_capture = (mv.capturePieceType() != nshogi::core::PTK_Empty);
+            const bool is_promotion = mv.promote();
+            const bool is_good_capture = is_capture && isGoodCapture(state, mv);
+
             st.doMove<C>(mv);
 
             int16_t score;
 
-            const bool is_capture = (mv.capturePieceType() != nshogi::core::PTK_Empty);
-            const bool is_promotion = mv.promote();
-
             // 簡易LMR
-            if(depth >= 3 && legal_moves_played >= 3 && !is_capture && !is_promotion && !is_in_check){
+            if (depth >= 3 && legal_moves_played >= 3 && !is_good_capture && !is_promotion && !is_in_check)
+            {
                 int reduction = 1;
-                
-                if(legal_moves_played >= 6) reduction = 2;
+
+                if (legal_moves_played >= 6)
+                    reduction = 2;
 
                 // 浅く探索する (depth - 1 - reduction)
                 score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1);
 
                 // もし浅く読んだ結果が Alpha を超えた場合はフル計算
-                if (!isStop.load(std::memory_order_relaxed) && score > alpha) {
+                if (!isStop.load(std::memory_order_relaxed) && score > alpha)
+                {
                     score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1);
-                } 
-            } else {
+                }
+            }
+            else
+            {
                 score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1);
             }
 
             st.undoMove();
 
-            if (isStop.load(std::memory_order_relaxed)) {
+            if (isStop.load(std::memory_order_relaxed))
+            {
                 return 0; // スコアを比較せず、すぐに抜ける
             }
 
@@ -276,7 +285,7 @@ namespace engine
                 best = score;
                 best_move = mv;
             }
-        
+
             alpha = std::max(alpha, best);
             if (alpha >= beta)
             {
