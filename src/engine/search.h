@@ -203,7 +203,8 @@ namespace engine
         int16_t static_eval = st.eval<C>();
 
         // NMP
-        if (!st.isInCheck() && depth > R && allow_null && static_eval >= beta)
+        int R_adaptive = 3 + depth / 6;
+        if (!st.isInCheck() && depth > R_adaptive && allow_null && static_eval >= beta)
         {
             st.doNullMove();
             int16_t score = -negamax<Oppo, false>(st, depth - 1 - R, -beta, -beta + 1, age, ply + 1);

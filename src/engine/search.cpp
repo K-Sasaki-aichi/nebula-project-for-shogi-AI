@@ -17,9 +17,9 @@ namespace engine
     std::atomic<bool> isStop(false);
 
     // 各スレッドで共有するrootのbestmove
-    std::atomic<nshogi::core::Move32> sharedBestMove{
-        nshogi::core::Move32::MoveNone()
-    };
+    // std::atomic<nshogi::core::Move32> sharedBestMove{
+    //     nshogi::core::Move32::MoveNone()
+    // };
 
     void helperThreadWorker(nshogi::core::State cloned_st, int thread_id, int target_depth){
         using nshogi::core::Black;
@@ -47,11 +47,11 @@ namespace engine
             int16_t alpha = -INF - 1;
             nshogi::core::Move32 local_best_move = nshogi::core::Move32::MoveNone();
 
-            auto shared = sharedBestMove.load(std::memory_order_relaxed);
-            nshogi::core::Move32 tt_move = shared;
+            //auto shared = sharedBestMove.load(std::memory_order_relaxed);
+            nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
 
             TTEntry entry;
-            if(tt_move == nshogi::core::Move32::MoveNone() && TT.read(hash, entry)){
+            if(TT.read(hash, entry)){
                 tt_move = entry.move;
             }
 
@@ -107,7 +107,7 @@ namespace engine
 
             // 反復深化の1つの深さ(i)の探索が終わった直後
             if (!local_best_move.isNone()) {
-                sharedBestMove.store(local_best_move, std::memory_order_relaxed);
+                // sharedBestMove.store(local_best_move, std::memory_order_relaxed);
                 TT.store(hash, local_best_move, alpha, 0, i, BOUND_EXACT, age);
             }
         }
@@ -121,7 +121,7 @@ namespace engine
         using nshogi::core::Black;
         using nshogi::core::White;
 
-        const int depth = 7;
+        const int depth = 9;
         const int INF = 30000;
         const int NUM_THREADS= 5;
         SearchResult result;
@@ -136,7 +136,7 @@ namespace engine
 
         isStop.store(false);
         std::vector<std::thread> threads;
-        sharedBestMove.store(nshogi::core::Move32::MoveNone(), std::memory_order_relaxed);
+        // sharedBestMove.store(nshogi::core::Move32::MoveNone(), std::memory_order_relaxed);
 
         for(int i = 0; i < NUM_THREADS; i++){
             threads.push_back(std::thread(helperThreadWorker, st.getState().clone(), i, depth));
@@ -148,11 +148,18 @@ namespace engine
 
         for (int i = 0; i < depth; i++)
         {
+            
             if (isStop.load(std::memory_order_relaxed))
             {
                 break;
             }
-            int16_t alpha = -INF - 1;
+            if (isStop.load(std::memory_order_relaxed))
+            {
+                break;
+            }
+
+            int16_t alpha = -INF;
+            int16_t beta  = INF;      
 
             nshogi::core::Move32 tt_move = result.bestMove;
 
@@ -160,14 +167,6 @@ namespace engine
 
             if (tt_move == nshogi::core::Move32::MoveNone() && TT.read(hash, entry)) {
                 tt_move = entry.move;
-            }
-
-            // 2. それでも tt_move が無い時（探索の極初期など）だけ、他スレッドの意見を聞く
-            if (tt_move == nshogi::core::Move32::MoveNone()) {
-                auto shared = sharedBestMove.load(std::memory_order_relaxed);
-                if (!shared.isNone()) {
-                    tt_move = shared;
-                }
             }
 
             MovePicker2<false> moves(st.getState(), tt_move);
@@ -232,7 +231,7 @@ namespace engine
 
             // 反復深化の1つの深さ(i)の探索が終わった直後
             TT.store(hash, result.bestMove, result.score, 0, i, BOUND_EXACT, age);
-            sharedBestMove.store(result.bestMove, std::memory_order_relaxed);
+            //sharedBestMove.store(result.bestMove, std::memory_order_relaxed);
         }
 
         isStop.store(true);
