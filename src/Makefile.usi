@@ -19,7 +19,7 @@ CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O3 -pthread
 LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static -pthread
 #LDFLAGS  += -pg
 
-USI_TARGET ?= nebula_debug_multi_5.exe
+USI_TARGET ?= nebula__multi_2.0_5.exe
 USI_SRCS := \
 	engine/usi.cpp \
 	engine/search.cpp \

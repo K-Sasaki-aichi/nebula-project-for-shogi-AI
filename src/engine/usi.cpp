@@ -329,6 +329,8 @@ namespace
         g_search.worker = std::thread([sfen_snapshot, weights_loaded]()
                                       {
             std::string best = "resign";
+            int depth = 0;
+            int score = 0;
 
             if (weights_loaded)
             {
@@ -337,6 +339,8 @@ namespace
                 if (!result.bestMove.isNone())
                 {
                     best = nshogi::io::sfen::move32ToSfen(result.bestMove);
+                    depth = result.depth;
+                    score = result.score;
                 }
             }
             else
@@ -359,6 +363,7 @@ namespace
             if (!g_search.pondering.load(std::memory_order_relaxed) &&
                 !engine::isStop.load(std::memory_order_relaxed))
             {
+                std::cout << "info depth " << depth << " score cp " << score << " pv " << best << std::endl;
                 sendBestmoveOnceFromStored();
             } });
     }
@@ -383,7 +388,7 @@ int main()
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_debug_multi_5");
+            writeLine("id name nebula__multi_2.0_5");
             writeLine("id author Sasaki, Horiuchi");
             writeLine("usiok");
             continue;

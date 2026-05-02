@@ -17,6 +17,10 @@ namespace engine
 {
     // 探索の終了を知らせるフラグ
     extern std::atomic<bool> isStop;
+    
+    // ベストの動きを共有する
+    extern std::atomic<nshogi::core::Move32> sharedBestMove;
+
 
     // オーバーフローを防ぐための安全な無限大
     constexpr int16_t INF = 30000;
