@@ -249,7 +249,7 @@ namespace engine
             else                                  stable_count = 0;
 
             if(i >= 7 && stable_count >= 3) break;
-            if(age < 30 && i >= 10) break;
+            if(age < 30 && main_td.nodes > 1000000) break;
 
             prev_best_move = result.bestMove;
             prev_score = result.score;
@@ -261,6 +261,8 @@ namespace engine
         }
 
         isStop.store(false);
+
+        std::cout << "nodes:" << main_td.nodes << std::endl;
 
         return result;
     }

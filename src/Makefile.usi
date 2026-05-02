@@ -1,23 +1,20 @@
-# USI engine build (does NOT modify the original src/makefile)
-# Usage (MSYS2 MINGW64):
-#   cd src
-#   mingw32-make -f Makefile.usi usi
-#
-# If you want to build nshogi automatically first:
-#   mingw32-make -f Makefile.usi nshogi usi
-
 CXX ?= clang++
 NSHOGI_BUILD ?= release
 
 NSHOGI_OBJDIR := nshogi/build/$(NSHOGI_BUILD)_$(CXX)
 
-# Keep flags close to the existing src/makefile defaults.
-CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O3 -pthread
-#CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O3 -g -fno-omit-frame-pointer
-#CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O0 -g -pg -fno-omit-frame-pointer
+# --- [修正ポイント1] コンパイルフラグの整理 ---
+# -flto は CXXFLAGS と LDFLAGS 両方に必要な場合があります
+BASE_FLAGS := -std=c++2b -I./nshogi/src -march=native -O3 -flto -ffast-math -fno-rtti -fno-stack-protector -fomit-frame-pointer -pthread
 
+CXXFLAGS ?= $(BASE_FLAGS)
+# 追加で PEXT などのマクロを定義
+CXXFLAGS += -DUSE_PEXT -DUSE_AVX2 -DUSE_BMI2
+
+# --- [修正ポイント2] LDFLAGS の強化 ---
+# リンク時にも -flto を渡し、かつリンカに lld を指定する
 LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static -pthread
-#LDFLAGS  += -pg
+LDFLAGS += -flto -fuse-ld=lld
 
 USI_TARGET ?= nebula_4_0.exe
 USI_SRCS := \
@@ -29,11 +26,12 @@ USI_SRCS := \
 
 .PHONY: usi nshogi clean
 
+# --- [修正ポイント3] リンクコマンド ---
 usi:
 	$(CXX) $(CXXFLAGS) $(USI_SRCS) -o $(USI_TARGET) $(LDFLAGS)
 
 nshogi:
-	$(MAKE) -C nshogi libnshogi BUILD=$(NSHOGI_BUILD) AVX2=1 CXX=$(CXX)
+	$(MAKE) -C nshogi libnshogi BUILD=$(NSHOGI_BUILD) AVX2=1 CXX=$(CXX) CXXFLAGS="$(CXXFLAGS) -fPIC"
 
 clean:
 	rm -f $(USI_TARGET) $(USI_SRCS:.cpp=.o)
