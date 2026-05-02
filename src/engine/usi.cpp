@@ -313,14 +313,14 @@ namespace
         }
         else
         {
-            int divisor = (PLY < 30) ? 50 : 20;
+            int divisor = (PLY < 30) ? 50 : 23;
             
             // 基本の計算
             think_time = (my_time / divisor) + my_inc; 
 
             // 3. 序盤の最低思考時間を短めに、中盤以降を長めにする調整
             // 序盤は 500ms、中盤以降は 2000ms を保証するなど
-            int min_think_time = (PLY < 30) ? 500 : 2000;
+            int min_think_time = (PLY < 30) ? 1000 : 2000;
             think_time = std::max(think_time, min_think_time);
 
             // 4. 残り時間による絶対制限（時間切れ防止）

@@ -277,7 +277,7 @@ namespace engine
             else
                 stable_count = 0;
 
-            if (i >= 8 && stable_count >= 3)
+            if (i >= 9 && stable_count >= 3)
                 break;
             if (age < 30 && main_td.nodes > 1500000)
                 break;
