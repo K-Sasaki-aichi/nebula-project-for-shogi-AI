@@ -12,11 +12,15 @@
 #include <atomic>
 #include <vector>
 #include <limits>
+#include <chrono>
 
 namespace engine
 {
     // 探索の終了を知らせるフラグ
     extern std::atomic<bool> isStop;
+
+    // 終了時間
+    extern std::atomic<long long> limitTimeMs;
 
     // ベストの動きを共有する
     extern std::atomic<nshogi::core::Move32> sharedBestMove;
@@ -32,12 +36,13 @@ namespace engine
     {
         nshogi::core::Move32 bestMove = nshogi::core::Move32::MoveNone();
         int32_t score = 0;
-        int32_t depth = 5;
+        int32_t depth = 0;
     };
 
     struct ThreadData
     {
         uint64_t nodes = 0;
+        bool isMain = false;
     };
 
     inline constexpr int MaxPly = 128;
@@ -146,6 +151,14 @@ namespace engine
     int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply, ThreadData &td)
     {
         td.nodes++;
+
+        if (td.isMain && (td.nodes & 2047) == 0) {
+            auto now = std::chrono::steady_clock::now().time_since_epoch();
+            long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+            if (now_ms >= engine::limitTimeMs.load(std::memory_order_relaxed)) {
+                engine::isStop.store(true, std::memory_order_relaxed);
+            }
+        }
 
         int16_t oriAlpha = alpha;
         auto &state = st.getState();
@@ -355,6 +368,6 @@ namespace engine
         return best;
     }
 
-    [[nodiscard]] SearchResult searchNNUE(nnue::StatewithNNUE &st);
+    [[nodiscard]] SearchResult searchNNUE(nnue::StatewithNNUE &st, int think_time);
 
 } // namespace engine

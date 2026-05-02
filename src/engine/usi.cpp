@@ -290,7 +290,7 @@ namespace
         }
         else
         {
-            think_time = (my_time / 30) + my_inc;
+            think_time = (my_time / 40) + my_inc;
 
             // 最低思考時間（ご希望の x 秒）をここで保証
             // 例：序盤でも最低 2秒は考えさせたい場合
@@ -335,7 +335,7 @@ namespace
         const std::string sfen_snapshot = nshogi::io::sfen::stateToSfen(ctx.state->getState());
         const bool weights_loaded = ctx.nnue_weights_loaded;
 
-        g_search.worker = std::thread([sfen_snapshot, weights_loaded]()
+        g_search.worker = std::thread([sfen_snapshot, weights_loaded, think_time]()
                                       {
             std::string best = "resign";
             int depth = 0;
@@ -344,7 +344,7 @@ namespace
             if (weights_loaded)
             {
                 nnue::StatewithNNUE local_state(nshogi::io::sfen::StateBuilder::newState(sfen_snapshot));
-                const auto result = engine::searchNNUE(local_state);
+                const auto result = engine::searchNNUE(local_state, think_time);
                 if (!result.bestMove.isNone())
                 {
                     best = nshogi::io::sfen::move32ToSfen(result.bestMove);
@@ -397,7 +397,7 @@ int main()
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_rfp__multi_2_0_5");
+            writeLine("id name nebula_4.0");
             writeLine("id author Sasaki, Horiuchi");
             writeLine("usiok");
             continue;

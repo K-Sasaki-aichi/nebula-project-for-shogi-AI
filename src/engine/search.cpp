@@ -5,11 +5,8 @@
 #include "../../nshogi/src/core/types.h"
 #include "../book/book.h"
 
-#include <atomic>
 #include <cstdint>
 #include <thread>
-#include <vector>
-#include <chrono>
 
 namespace engine
 {
@@ -17,6 +14,7 @@ namespace engine
 
     std::atomic<bool> isStop(false);
 
+    std::atomic<long long> limitTimeMs{0};
     // 各スレッドで共有するrootのbestmove
     // std::atomic<nshogi::core::Move32> sharedBestMove{
     //     nshogi::core::Move32::MoveNone()
@@ -113,13 +111,17 @@ namespace engine
 
 
     // 引数を StatewithNNUE の参照に変更します
-    SearchResult searchNNUE(nnue::StatewithNNUE &st)
+    SearchResult searchNNUE(nnue::StatewithNNUE &st, int think_time)
     {
         initKillers();
         using nshogi::core::Black;
         using nshogi::core::White;
 
-        const int depth = 8;
+        auto now = std::chrono::steady_clock::now().time_since_epoch();
+        long long start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+        limitTimeMs.store(start_ms + think_time, std::memory_order_relaxed);
+
+        const int depth = 40;
         const int INF = 30000;
         const int NUM_THREADS= 5;
         std::vector<ThreadData> threadData(NUM_THREADS);
@@ -149,6 +151,7 @@ namespace engine
         const int age = st.getPly();
         int16_t tt_score;
         ThreadData& main_td = threadData[0];
+        main_td.isMain = true;
 
         nshogi::core::Move32 prev_best_move = nshogi::core::Move32::MoveNone();
         int16_t prev_score = 0;
@@ -245,7 +248,7 @@ namespace engine
             if(prev_best_move == result.bestMove) stable_count++;
             else                                  stable_count = 0;
 
-            if(i >= 5 && stable_count >= 3) break;
+            if(i >= 7 && stable_count >= 3) break;
 
             prev_best_move = result.bestMove;
             prev_score = result.score;
