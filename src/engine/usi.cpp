@@ -313,7 +313,7 @@ namespace
         }
         else
         {
-            int divisor = (PLY < 30) ? 50 : 25;
+            int divisor = (PLY < 30) ? 50 : 20;
             
             // 基本の計算
             think_time = (my_time / divisor) + my_inc; 
@@ -324,7 +324,7 @@ namespace
             think_time = std::max(think_time, min_think_time);
 
             // 4. 残り時間による絶対制限（時間切れ防止）
-            int absolute_limit = my_time * 0.8;
+            int absolute_limit = my_time * 0.85;
             think_time = std::min(think_time, absolute_limit);
         }
 

@@ -248,8 +248,8 @@ namespace engine
             if(prev_best_move == result.bestMove) stable_count++;
             else                                  stable_count = 0;
 
-            if(i >= 7 && stable_count >= 3) break;
-            if(age < 30 && main_td.nodes > 1000000) break;
+            if(i >= 8 && stable_count >= 3) break;
+            if(age < 30 && main_td.nodes > 1500000) break;
 
             prev_best_move = result.bestMove;
             prev_score = result.score;
