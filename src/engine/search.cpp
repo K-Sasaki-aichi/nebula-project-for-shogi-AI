@@ -136,7 +136,7 @@ namespace engine
         // 定跡
         const uint64_t hash = st.getHash();
 
-        if (st.getPLY() <= 50)
+        if (PLY <= 50)
         {
             const nshogi::core::Move32 b_move = findBookMove(hash);
             if (!b_move.isNone())
@@ -277,8 +277,6 @@ namespace engine
             else
                 stable_count = 0;
 
-            if (age < 55 && i >= 9 && stable_count >= 3)
-                break;
             if (i >= 10 && stable_count >= 3)
                 break;
 

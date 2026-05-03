@@ -27,7 +27,7 @@ CXXFLAGS += -flto -fuse-ld=lld
 LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static -pthread
 #LDFLAGS  += -pg
 
-USI_TARGET ?= nebula_debug.exe
+USI_TARGET ?= nebula.exe
 USI_SRCS := \
 	engine/usi.cpp \
 	engine/search.cpp \

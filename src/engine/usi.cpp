@@ -313,7 +313,7 @@ namespace
         }
         else
         {
-            int divisor = (PLY < 30) ? 40 : 23;
+            int divisor = (PLY < 30) ? 30 : 15;
 
             // 基本の計算
             think_time = (my_time / divisor) + my_inc;
@@ -421,7 +421,7 @@ int main()
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_debug");
+            writeLine("id name nebula");
             writeLine("id author Sasaki, Horiuchi");
             writeLine("usiok");
             continue;
