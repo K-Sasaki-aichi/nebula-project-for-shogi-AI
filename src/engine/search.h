@@ -152,10 +152,12 @@ namespace engine
     {
         td.nodes++;
 
-        if (td.isMain && (td.nodes & 2047) == 0) {
+        if (td.isMain && (td.nodes & 2047) == 0)
+        {
             auto now = std::chrono::steady_clock::now().time_since_epoch();
             long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-            if (now_ms >= engine::limitTimeMs.load(std::memory_order_relaxed)) {
+            if (now_ms >= engine::limitTimeMs.load(std::memory_order_relaxed))
+            {
                 engine::isStop.store(true, std::memory_order_relaxed);
             }
         }
@@ -179,12 +181,12 @@ namespace engine
         default:
             break;
         }
-        
+
         // 宣言勝ち
-        if(state.canDeclare()){
+        if (state.canDeclare())
+        {
             return INF - ply;
         }
-
 
         if (isStop.load(std::memory_order_relaxed))
         {
@@ -351,7 +353,8 @@ namespace engine
         {
             // 1手も指せなかった ＝ 詰まされている（またはステールメイト）
             const auto lastMove = state.getLastMove();
-            if(lastMove.drop() && lastMove.pieceType() == nshogi::core::PTK_Pawn){
+            if (lastMove.drop() && lastMove.pieceType() == nshogi::core::PTK_Pawn)
+            {
                 return INF - ply;
             }
             return -(INF - ply);
@@ -378,6 +381,6 @@ namespace engine
         return best;
     }
 
-    [[nodiscard]] SearchResult searchNNUE(nnue::StatewithNNUE &st, int think_time);
+    [[nodiscard]] SearchResult searchNNUE(nnue::StatewithNNUE &st, int think_time, int PLY);
 
 } // namespace engine

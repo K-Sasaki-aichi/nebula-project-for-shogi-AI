@@ -313,10 +313,10 @@ namespace
         }
         else
         {
-            int divisor = (PLY < 30) ? 50 : 23;
-            
+            int divisor = (PLY < 30) ? 40 : 23;
+
             // 基本の計算
-            think_time = (my_time / divisor) + my_inc; 
+            think_time = (my_time / divisor) + my_inc;
 
             // 3. 序盤の最低思考時間を短めに、中盤以降を長めにする調整
             // 序盤は 500ms、中盤以降は 2000ms を保証するなど
@@ -369,7 +369,7 @@ namespace
             if (weights_loaded)
             {
                 nnue::StatewithNNUE local_state(nshogi::io::sfen::StateBuilder::newState(sfen_snapshot));
-                const auto result = engine::searchNNUE(local_state, think_time);
+                const auto result = engine::searchNNUE(local_state, think_time, PLY);
                 if (!result.bestMove.isNone())
                 {
                     best = nshogi::io::sfen::move32ToSfen(result.bestMove);
@@ -421,7 +421,7 @@ int main()
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_4.1");
+            writeLine("id name nebula_debug");
             writeLine("id author Sasaki, Horiuchi");
             writeLine("usiok");
             continue;

@@ -20,7 +20,7 @@ namespace engine
     //     nshogi::core::Move32::MoveNone()
     // };
 
-    void helperThreadWorker(nshogi::core::State cloned_st, int thread_id, int target_depth, ThreadData &td)
+    void helperThreadWorker(nshogi::core::State cloned_st, int thread_id, int target_depth, ThreadData &td, int PLY)
     {
         using nshogi::core::Black;
         using nshogi::core::White;
@@ -31,7 +31,7 @@ namespace engine
         const int INF = 30000;
 
         const auto side = st.getSideToMove();
-        const int age = st.getPly();
+        const int age = PLY;
         const uint64_t hash = st.getHash();
 
         // 探索の多様化: スレッドごとに開始深さを変える
@@ -117,7 +117,7 @@ namespace engine
     }
 
     // 引数を StatewithNNUE の参照に変更します
-    SearchResult searchNNUE(nnue::StatewithNNUE &st, int think_time)
+    SearchResult searchNNUE(nnue::StatewithNNUE &st, int think_time, int PLY)
     {
         initKillers();
         using nshogi::core::Black;
@@ -129,7 +129,7 @@ namespace engine
 
         const int depth = 40;
         const int INF = 30000;
-        const int NUM_THREADS = 7;
+        const int NUM_THREADS = 3;
         std::vector<ThreadData> threadData(NUM_THREADS);
         SearchResult result;
 
@@ -152,11 +152,11 @@ namespace engine
 
         for (int i = 0; i < NUM_THREADS; i++)
         {
-            threads.push_back(std::thread(helperThreadWorker, st.getState().clone(), i, depth, std::ref(threadData[i])));
+            threads.push_back(std::thread(helperThreadWorker, st.getState().clone(), i, depth, std::ref(threadData[i]), PLY));
         }
 
         const auto side = st.getSideToMove();
-        const int age = st.getPly();
+        const int age = PLY;
         int16_t tt_score;
         ThreadData &main_td = threadData[0];
         main_td.isMain = true;
@@ -180,7 +180,7 @@ namespace engine
                 res.score = INF;
                 res.depth = 0;
 
-                std::cout << "bestmove win"  << std::endl;
+                std::cout << "bestmove win" << std::endl;
                 exit(0);
                 // 探索せずに即座に終わる！
                 return res;
@@ -277,9 +277,9 @@ namespace engine
             else
                 stable_count = 0;
 
-            if (i >= 9 && stable_count >= 3)
+            if (age < 55 && i >= 9 && stable_count >= 3)
                 break;
-            if (age < 30 && main_td.nodes > 1500000)
+            if (i >= 10 && stable_count >= 3)
                 break;
 
             prev_best_move = result.bestMove;

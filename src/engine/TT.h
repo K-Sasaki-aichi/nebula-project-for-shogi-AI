@@ -74,8 +74,7 @@ namespace engine
             {
                 // 【同じ局面の場合】
                 // 今の探索の方が深い（または同じ）、あるいは同じ深さでもより正確なBoundなら上書き
-                // ※「depth >= entry->depth - 2」のように少し浅くても最新の情報を優先するテクニックもあります
-                if (depth >= entry->depth)
+                if (depth > entry->depth)
                 {
                     replace = true;
                 }
@@ -89,7 +88,7 @@ namespace engine
                     replace = true;
                 }
                 // 2. 同じ手番の探索中なら、深さを比較して「今の探索の方が深い（価値が高い）」場合のみ上書き
-                else if (depth >= entry->depth)
+                else if (depth > entry->depth)
                 {
                     replace = true;
                 }
