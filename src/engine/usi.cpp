@@ -313,7 +313,7 @@ namespace
         }
         else
         {
-            int divisor = (PLY < 30) ? 30 : 15;
+            int divisor = (PLY < 30) ? 20 : 15;
 
             // 基本の計算
             think_time = (my_time / divisor) + my_inc;

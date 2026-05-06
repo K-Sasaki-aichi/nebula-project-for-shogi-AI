@@ -277,9 +277,11 @@ namespace engine
             else
                 stable_count = 0;
 
-            if (i >= 10 && stable_count >= 3)
+            if (age < 55 && i >= 11 && stable_count >= 3)
                 break;
 
+            if(age >= 55 && i >= 13 && stable_count >= 4)
+                break;
             prev_best_move = result.bestMove;
             prev_score = result.score;
         }

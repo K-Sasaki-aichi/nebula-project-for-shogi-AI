@@ -12,6 +12,7 @@
 
 #include "types.h"
 #include <cstddef>
+#include <algorithm>
 
 namespace nshogi {
 namespace core {

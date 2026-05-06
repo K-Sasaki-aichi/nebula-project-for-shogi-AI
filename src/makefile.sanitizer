@@ -1,0 +1,29 @@
+CXX = clang++
+NSHOGI_BUILD ?= release
+
+NSHOGI_OBJDIR := nshogi/build/$(NSHOGI_BUILD)_$(CXX)
+
+# CLANG64環境では -static-libasan 等の特殊な指定は不要です
+CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -pthread
+CXXFLAGS += -ffast-math -fno-rtti -fno-stack-protector
+
+LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static -pthread -fsanitize=address,undefined
+
+USI_TARGET ?= nebula.exe
+USI_SRCS := \
+	engine/usi.cpp \
+	engine/search.cpp \
+	engine/nn/nnue_nn.cpp \
+	model/weights.cpp \
+	book/book.cpp
+
+.PHONY: usi nshogi clean
+
+usi:
+	$(CXX) $(CXXFLAGS) $(USI_SRCS) -o $(USI_TARGET) $(LDFLAGS)
+
+nshogi:
+	$(MAKE) -C nshogi libnshogi BUILD=$(NSHOGI_BUILD) AVX2=1 CXX=$(CXX)
+
+clean:
+	rm -f $(USI_TARGET) $(USI_SRCS:.cpp=.o)

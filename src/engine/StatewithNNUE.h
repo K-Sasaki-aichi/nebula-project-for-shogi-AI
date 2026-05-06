@@ -253,9 +253,9 @@ public:
     template<Color Us>
     inline constexpr int8_t SquareToSqId(const Square Sq){
         if constexpr(Us== nshogi::core::White){
-            return 80 - SqIdTable[Sq];
+            return 80 - SqIdTable[Sq%81];
         }
-        return SqIdTable[Sq];
+        return SqIdTable[Sq%81];
     }
 
     // 成りコマに変換する関数
@@ -289,7 +289,7 @@ public:
     //Usは盤面を見ている手番、Cは今見ているコマの色
     template<Color Us, Color C>
     inline constexpr int32_t getIndex(const PieceTypeKind type, const Square Sq, const int count, const bool isStand) {
-        const int sqId = SquareToSqId<Us>(Sq);
+        const int sqId = isStand ? 0 : SquareToSqId<Us>(Sq);
 
         const int base = typeIdtable[Us != C][nshogi::core::NumPieceType * isStand + type];
 
@@ -445,7 +445,7 @@ public:
         const bool isDrop = M.drop();
         const Square sq_from = M.from();
         const Square sq_to = M.to();
-        const int count = adapter->getStandCount<Us>(type) + 1;
+        const int count = (isDrop) ? adapter->getStandCount<Us>(type) + 1 : 0;
 
         int num = 0;
 
