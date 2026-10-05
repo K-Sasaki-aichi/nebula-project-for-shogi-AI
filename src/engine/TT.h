@@ -3,6 +3,8 @@
 #include <cstring>
 #include "TTentry.h"
 
+#include <mutex>
+
 namespace engine
 {
 
@@ -11,6 +13,8 @@ namespace engine
     private:
         std::vector<TTEntry> table;
         uint64_t mask;
+
+        mutable std::mutex mtx;
 
     public:
         TranspositionTable()
@@ -35,26 +39,42 @@ namespace engine
             return &table[hash & mask];
         }
 
+        // inline bool read(uint64_t hash, TTEntry &out) const
+        // {
+        //     TTEntry *entry = const_cast<TTEntry *>(&table[hash & mask]);
+
+        //     uint32_t key = static_cast<uint32_t>(hash >> 32);
+
+        //     uint32_t k1 = entry->key;
+        //     if (k1 != key)
+        //         return false;
+
+        //     // コピー
+        //     std::memcpy(&out, entry, sizeof(TTEntry));
+
+        //     uint32_t k2 = entry->key;
+
+        //     // 安全のためにダブルチェック
+        //     if (k1 != k2 || k1 != key)
+        //         return false;
+
+        //     return true;
+        // }
+
         inline bool read(uint64_t hash, TTEntry &out) const
         {
+            std::lock_guard<std::mutex> lock(mtx);
+
             TTEntry *entry = const_cast<TTEntry *>(&table[hash & mask]);
 
             uint32_t key = static_cast<uint32_t>(hash >> 32);
 
-            uint32_t k1 = entry->key;
-            if (k1 != key)
+            if (entry->key != key)
                 return false;
 
-            // コピー
             std::memcpy(&out, entry, sizeof(TTEntry));
 
-            uint32_t k2 = entry->key;
-
-            // 安全のためにダブルチェック
-            if (k1 != k2 || k1 != key)
-                return false;
-
-            return true;
+            return entry->key == key;
         }
 
         inline void store(uint64_t hash,
@@ -65,6 +85,9 @@ namespace engine
                           Bound bound,
                           uint8_t age)
         {
+            std::lock_guard<std::mutex> lock(mtx);
+
+
             TTEntry *entry = &table[hash & mask];
             uint32_t key = static_cast<uint32_t>(hash >> 32);
 

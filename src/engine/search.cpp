@@ -129,8 +129,8 @@ namespace engine
 
         const int depth = 40;
         const int INF = 30000;
-        const int NUM_THREADS = 3;
-        std::vector<ThreadData> threadData(NUM_THREADS);
+        const int NUM_THREADS = 1;
+        std::vector<ThreadData> threadData(NUM_THREADS + 1);
         SearchResult result;
 
         // 定跡
@@ -158,7 +158,7 @@ namespace engine
         const auto side = st.getSideToMove();
         const int age = PLY;
         int16_t tt_score;
-        ThreadData &main_td = threadData[0];
+        ThreadData &main_td = threadData[NUM_THREADS];
         main_td.isMain = true;
 
         nshogi::core::Move32 prev_best_move = nshogi::core::Move32::MoveNone();
@@ -188,6 +188,10 @@ namespace engine
 
             int16_t alpha = -INF;
             int16_t beta = INF;
+
+            // add: この深さ(i)での最善手を一時的に保持する変数
+            nshogi::core::Move32 current_best_move = nshogi::core::Move32::MoveNone();
+            int16_t current_best_score = -INF;
 
             nshogi::core::Move32 tt_move = result.bestMove;
 
@@ -223,8 +227,10 @@ namespace engine
                     if (score > alpha)
                     {
                         alpha = score;
-                        result.bestMove = mv;
-                        result.score = score;
+                        current_best_move = mv;
+                        current_best_score = score;
+                        // result.bestMove = mv;
+                        // result.score = score;
                     }
 
                     mv = moves.next();
@@ -250,8 +256,10 @@ namespace engine
                     if (score > alpha)
                     {
                         alpha = score;
-                        result.bestMove = mv;
-                        result.score = score;
+                        current_best_move = mv;
+                        current_best_score = score;
+                        // result.bestMove = mv;
+                        // result.score = score;
                     }
 
                     mv = moves.next();
@@ -260,12 +268,14 @@ namespace engine
                 break;
             }
 
-            result.depth = i;
-
             if (isStop.load(std::memory_order_relaxed))
             {
                 break;
             }
+
+            result.bestMove = current_best_move;
+            result.score = current_best_score;
+            result.depth = i;
 
             // 反復深化の1つの深さ(i)の探索が終わった直後
             TT.store(hash, result.bestMove, result.score, 0, i, BOUND_EXACT, age);
