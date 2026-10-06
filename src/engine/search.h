@@ -211,23 +211,23 @@ namespace engine
 
         //一度実験の為に消す
         //なんでネストになってるの？
-        // if (TT.read(hash, entry))
-        // {
-        //     if (entry.depth >= depth)
-        //     {
-        //         int16_t tt_score = entry.score;
-        //         Bound bound = entry.getBound();
+        if (TT.read(hash, entry))
+        {
+            if (entry.depth >= depth)
+            {
+                int16_t tt_score = entry.score;
+                Bound bound = entry.getBound();
 
-        //         if (bound == BOUND_EXACT)
-        //             return tt_score;
+                if (bound == BOUND_EXACT)
+                    return tt_score;
 
-        //         if (bound == BOUND_LOWER && tt_score >= beta)
-        //             return tt_score;
+                if (bound == BOUND_LOWER && tt_score >= beta)
+                    return tt_score;
 
-        //         if (bound == BOUND_UPPER && tt_score <= alpha)
-        //             return tt_score;
-        //     }
-        // }
+                if (bound == BOUND_UPPER && tt_score <= alpha)
+                    return tt_score;
+            }
+        }
 
         // 1. NMPのための静的評価値チェック（TTにスコアがあればそれを使う実装に拡張も可能）
         int16_t static_eval = st.eval<C>();
@@ -296,7 +296,8 @@ namespace engine
             int16_t score;
 
             // 簡易LMR
-            if (depth >= 3 && legal_moves_played >= 3 && !is_good_capture && !is_promotion && !is_in_check)
+            //いったんfalseにする。
+            if (false && depth >= 3 && legal_moves_played >= 3 && !is_good_capture && !is_promotion && !is_in_check)
             {
                 int reduction = 1;
 
