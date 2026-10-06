@@ -107,7 +107,6 @@ namespace engine
                 break;
             }
 
-            // 反復深化の1つの深さ(i)の探索が終わった直後
             if (!local_best_move.isNone())
             {
                 // sharedBestMove.store(local_best_move, std::memory_order_relaxed);
@@ -129,7 +128,7 @@ namespace engine
 
         const int depth = 40;
         const int INF = 30000;
-        const int NUM_THREADS = 1;
+        const int NUM_THREADS = 2;
         std::vector<ThreadData> threadData(NUM_THREADS + 1);
         SearchResult result;
 
@@ -217,6 +216,14 @@ namespace engine
                     // }
                     st.doMove<Black>(mv);
                     int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0, main_td);
+
+                    //######
+std::cout
+    << "depth=" << i
+    << " move=" << static_cast<uint32_t>(mv.value())
+    << " score=" << score
+    << '\n';
+                    //######
                     st.undoMove();
 
                     if (isStop.load(std::memory_order_relaxed))
@@ -247,6 +254,15 @@ namespace engine
                     // }
                     st.doMove<White>(mv);
                     int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0, main_td);
+
+                    //######
+std::cout
+    << "depth=" << i
+    << " move=" << static_cast<uint32_t>(mv.value())
+    << " score=" << score
+    << '\n';
+                    //######
+
                     st.undoMove();
                     if (isStop.load(std::memory_order_relaxed))
                     {
