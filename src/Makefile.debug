@@ -1,0 +1,58 @@
+# -------------------------------------------------------------
+# ビルド手順 (Ubuntu/WSL2環境用)
+#   1. make -f Makefile.debug clean && make -C nshogi clean
+#   2. make -f Makefile.debug nshogi
+#   3. make -f Makefile.debug nebula
+# -------------------------------------------------------------
+
+# 先ほど成功した clang++ に戻してあります
+CXX ?= clang++
+# NSHOGI_BUILD ?= release
+NSHOGI_BUILD ?= sanitizer
+
+NSHOGI_OBJDIR := nshogi/build/$(NSHOGI_BUILD)_$(CXX)
+
+# -------------------------------------------------------------
+# 【ThreadSanitizer 検証用設定】
+# 現在はこちらが有効になっています。
+# データ競合（Data Race）やLazy SMPの評価値ブレを検出します。
+# -------------------------------------------------------------
+CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O1 -g -fno-omit-frame-pointer -pthread
+CXXFLAGS += -ffast-math -fno-rtti -DUSE_PEXT
+CXXFLAGS += -fsanitize=thread
+CXXFLAGS += -fno-pie -fno-pic
+
+LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static -pthread -fsanitize=thread
+LDFLAGS += -no-pie
+
+# -------------------------------------------------------------
+# 【リリース用設定】(現在はコメントアウト)
+# -------------------------------------------------------------
+# CXXFLAGS ?= -std=c++2b -I./nshogi/src -mtune=native -march=native -O3 -pthread
+# CXXFLAGS += -ffast-math -fno-rtti -fno-stack-protector -flto -DUSE_PEXT
+# CXXFLAGS += -flto -fuse-ld=lld
+# LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static -pthread
+# -------------------------------------------------------------
+
+USI_TARGET ?= nebula_sanitizer.exe
+
+# 先ほど成功した構成（engine/main.cpp は不要）
+USI_SRCS := \
+	engine/usi.cpp \
+	engine/search.cpp \
+	engine/nn/nnue_nn.cpp \
+	model/weights.cpp \
+	book/book.cpp
+
+# usi を nebula に変更
+.PHONY: nebula nshogi clean
+
+nebula:
+	$(CXX) $(CXXFLAGS) $(USI_SRCS) -o $(USI_TARGET) $(LDFLAGS)
+
+nshogi:
+	# 子のMakefile (nshogi) にもサニタイザの設定を引き継がせる
+	$(MAKE) -C nshogi libnshogi BUILD=$(NSHOGI_BUILD) AVX2=1 CXX=$(CXX) CXXFLAGS="$(CXXFLAGS)" LDFLAGS="$(LDFLAGS)"
+
+clean:
+	rm -f $(USI_TARGET) $(USI_SRCS:.cpp=.o)

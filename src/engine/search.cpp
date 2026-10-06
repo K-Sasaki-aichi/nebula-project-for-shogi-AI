@@ -218,11 +218,11 @@ namespace engine
                     int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0, main_td);
 
                     //######
-std::cout
-    << "depth=" << i
-    << " move=" << static_cast<uint32_t>(mv.value())
-    << " score=" << score
-    << '\n';
+// std::cout
+//     << "depth=" << i
+//     << " move=" << static_cast<uint32_t>(mv.value())
+//     << " score=" << score
+//     << '\n';
                     //######
                     st.undoMove();
 
@@ -256,11 +256,11 @@ std::cout
                     int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0, main_td);
 
                     //######
-std::cout
-    << "depth=" << i
-    << " move=" << static_cast<uint32_t>(mv.value())
-    << " score=" << score
-    << '\n';
+// std::cout
+//     << "depth=" << i
+//     << " move=" << static_cast<uint32_t>(mv.value())
+//     << " score=" << score
+//     << '\n';
                     //######
 
                     st.undoMove();
