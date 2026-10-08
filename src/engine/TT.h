@@ -97,7 +97,7 @@ namespace engine
             {
                 // 【同じ局面の場合】
                 // 今の探索の方が深い（または同じ）、あるいは同じ深さでもより正確なBoundなら上書き
-                if (depth > entry->depth)
+                if (depth >= entry->depth)
                 {
                     replace = true;
                 }

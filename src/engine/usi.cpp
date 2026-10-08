@@ -21,6 +21,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <fstream>
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -411,17 +412,22 @@ int main()
 
     EngineContext ctx;
 
+    std::ofstream logf("nebula_input_log.txt", std::ios::app);
+
     for (std::string line; std::getline(std::cin, line);)
     {
         const auto tokens = splitTokens(line);
         if (tokens.empty())
             continue;
 
+        logf << "> " << line << "\n";   // ← 追加
+        logf.flush();                   // ← 追加
+
         const auto &cmd = tokens[0];
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_10_8");
+            writeLine("id name nebula_10_9_3");
             writeLine("id author Sasaki, Horiuchi");
             writeLine("usiok");
             continue;
