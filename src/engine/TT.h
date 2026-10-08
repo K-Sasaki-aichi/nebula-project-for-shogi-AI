@@ -74,7 +74,7 @@ namespace engine
 
             std::memcpy(&out, entry, sizeof(TTEntry));
 
-            return entry->key == key;
+            return true;
         }
 
         inline void store(uint64_t hash,

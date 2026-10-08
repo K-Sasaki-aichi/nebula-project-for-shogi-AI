@@ -19,26 +19,43 @@
         int16_t  score;             // 2 bytes: 探索で得られた評価値
         int16_t  eval;              // 2 bytes: NNUEの静的評価値（Static Evaluation）
         uint8_t  depth;             // 1 byte : 探索深さ (0~255)
-        uint8_t  bound_age;         // 1 byte : 下位2bitにBound、上位6bitにAge(世代)を同居
-        uint16_t padding;           // 2 bytes: 16バイトに揃えるためのパディング
+        uint8_t age;                // 1 byte : age(世代)
+        uint8_t  bound;             // 1 byte : Bound(評価値の種類)
+        uint8_t padding;            // 1 bytes: 16バイトに揃えるためのパディング
 
         // バウンドの取得
         inline Bound getBound() const {
-            return static_cast<Bound>(bound_age & 0b00000011); // 下位2ビット
+            return static_cast<Bound>(bound);
         }
 
         // 世代の取得
         inline uint8_t getAge() const {
-            return bound_age >> 2; // 上位6ビット
+            return age; // 上位6ビット
         }
 
         // 書き込み用
-        inline void save(uint32_t k, nshogi::core::Move32 m, int16_t s, int16_t e, uint8_t d, Bound b, uint8_t age) {
+        inline void save(uint32_t k,
+          Move32 m,
+          int16_t s,
+          int16_t e,
+          uint8_t d,
+          Bound b,
+          uint8_t a)
+        {
+            key = k;
             move = m;
             score = s;
             eval = e;
             depth = d;
-            bound_age = (age << 2) | b;
-            key = k;
+            bound = static_cast<uint8_t>(b);
+            age = a;
         }
+        // inline void save(uint32_t k, nshogi::core::Move32 m, int16_t s, int16_t e, uint8_t d, Bound b, uint8_t age) {
+        //     move = m;
+        //     score = s;
+        //     eval = e;
+        //     depth = d;
+        //     bound_age = (age << 2) | b;
+        //     key = k;
+        // }
     };
