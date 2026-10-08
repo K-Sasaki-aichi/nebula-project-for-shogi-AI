@@ -4,8 +4,6 @@
 #include "../nshogi/src/core/movegenerator.h"
 #include "../../nshogi/src/core/types.h"
 #include "../book/book.h"
-#include "../nshogi/src/io/sfen.h"
-#include <fstream>
 
 #include <cstdint>
 #include <thread>
@@ -21,12 +19,6 @@ namespace engine
     // std::atomic<nshogi::core::Move32> sharedBestMove{
     //     nshogi::core::Move32::MoveNone()
     // };
-
-    static void logSearch(const std::string &msg)
-    {
-        std::ofstream f("nebula_search_log.txt", std::ios::app);
-        f << msg << "\n";
-    }
 
     void helperThreadWorker(nshogi::core::State cloned_st, int thread_id, int target_depth, ThreadData &td, int PLY)
     {
@@ -133,9 +125,6 @@ namespace engine
         auto now = std::chrono::steady_clock::now().time_since_epoch();
         long long start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
         limitTimeMs.store(start_ms + think_time, std::memory_order_relaxed);
-
-        logSearch("---- go ---- think_time=" + std::to_string(think_time) +
-                " PLY=" + std::to_string(PLY));   // ← 追加
 
         const int depth = 40;
         const int INF = 30000;
@@ -304,11 +293,6 @@ namespace engine
             result.score = current_best_score;
             result.depth = i;
 
-            logSearch("[d=" + std::to_string(i) +
-                      "] move=" + nshogi::io::sfen::move32ToSfen(result.bestMove) +
-                      " score=" + std::to_string(result.score) +
-                      " nodes=" + std::to_string(main_td.nodes));
-
             // 反復深化の1つの深さ(i)の探索が終わった直後
             TT.store(hash, result.bestMove, result.score, 0, i, BOUND_EXACT, age);
             // sharedBestMove.store(result.bestMove, std::memory_order_relaxed);
@@ -336,10 +320,6 @@ namespace engine
         }
 
         isStop.store(false);
-
-        logSearch("[final] move=" + nshogi::io::sfen::move32ToSfen(result.bestMove) +
-                  " score=" + std::to_string(result.score) +
-                  " depth=" + std::to_string(result.depth));
 
         std::cout << "nodes:" << main_td.nodes << std::endl;
         // think_time が 0 の場合に備える

@@ -148,7 +148,7 @@ namespace engine
     }
 
     template <nshogi::core::Color C, bool allow_null = true>
-    int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply, ThreadData &td, bool is_store = true)
+    int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply, ThreadData &td)
     {
         td.nodes++;
 
@@ -166,27 +166,27 @@ namespace engine
         auto &state = st.getState();
         const auto repetition = state.getRepetitionStatus();
         // 千日手の判定
-        // switch (repetition)
-        // {
-        // case nshogi::core::RepetitionStatus::WinRepetition:
-        //     return 30000 - ply; // 王手連続の千日手勝ち
-        // case nshogi::core::RepetitionStatus::LossRepetition:
-        //     return -30000 + ply; // 王手連続の千日手負け
-        // case nshogi::core::RepetitionStatus::Repetition:
-        //     return 0; // 通常の千日手
-        // case nshogi::core::RepetitionStatus::SuperiorRepetition:
-        //     return 30000 - ply;
-        // case nshogi::core::RepetitionStatus::InferiorRepetition:
-        //     return -30000 + ply;
-        // default:
-        //     break;
-        // }
+        switch (repetition)
+        {
+        case nshogi::core::RepetitionStatus::WinRepetition:
+            return 30000 - ply; // 王手連続の千日手勝ち
+        case nshogi::core::RepetitionStatus::LossRepetition:
+            return -30000 + ply; // 王手連続の千日手負け
+        case nshogi::core::RepetitionStatus::Repetition:
+            return 0; // 通常の千日手
+        case nshogi::core::RepetitionStatus::SuperiorRepetition:
+            return 30000 - ply;
+        case nshogi::core::RepetitionStatus::InferiorRepetition:
+            return -30000 + ply;
+        default:
+            break;
+        }
 
-        // // 宣言勝ち
-        // if (state.canDeclare())
-        // {
-        //     return INF - ply;
-        // }
+        // 宣言勝ち
+        if (state.canDeclare())
+        {
+            return INF - ply;
+        }
 
         if (isStop.load(std::memory_order_relaxed))
         {
@@ -245,10 +245,10 @@ namespace engine
 
         // NMP
         int R_adaptive = 3 + depth / 6;
-        if (ply > 0 && !st.isInCheck() && depth > R_adaptive && allow_null && static_eval >= beta)
+        if (!st.isInCheck() && depth > R_adaptive && allow_null && static_eval >= beta)
         {
             st.doNullMove();
-            int16_t score = -negamax<Oppo, false>(st, depth - 1 - R, -beta, -beta + 1, age, ply + 1, td, false);
+            int16_t score = -negamax<Oppo, false>(st, depth - 1 - R, -beta, -beta + 1, age, ply + 1, td);
 
             st.undoNullMove();
 
@@ -296,7 +296,7 @@ namespace engine
             int16_t score;
 
             // 簡易LMR
-            if (ply > 0 && depth >= 3 && legal_moves_played >= 3 && !is_good_capture && !is_promotion && !is_in_check)
+            if (depth >= 3 && legal_moves_played >= 3 && !is_good_capture && !is_promotion && !is_in_check)
             {
                 int reduction = 1;
 
@@ -304,7 +304,7 @@ namespace engine
                      reduction = 2;
 
                 // 浅く探索する (depth - 1 - reduction)
-                score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1, td, false);
+                score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1, td);
 
                 // もし浅く読んだ結果が Alpha を超えた場合はフル計算
                 if (!isStop.load(std::memory_order_relaxed) && score > alpha)
@@ -378,11 +378,11 @@ namespace engine
         }
 
         // 静的評価値(eval)は今度考える.
-        if(is_store)
-            TT.store(hash, best_move, best, 0, depth, bound, age);
+        TT.store(hash, best_move, best, 0, depth, bound, age);
 
         return best;
     }
 
     [[nodiscard]] SearchResult searchNNUE(nnue::StatewithNNUE &st, int think_time, int PLY);
+
 } // namespace engine
