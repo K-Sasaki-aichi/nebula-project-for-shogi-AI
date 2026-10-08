@@ -19,7 +19,7 @@ namespace engine
     public:
         TranspositionTable()
         {
-            resize(1024 * 4);
+            resize(1024 * 1.5);
         }
 
         void resize(size_t size_mb)

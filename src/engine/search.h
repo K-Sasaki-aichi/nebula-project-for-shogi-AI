@@ -296,13 +296,12 @@ namespace engine
             int16_t score;
 
             // 簡易LMR
-            //いったんfalseにする。
             if (depth >= 3 && legal_moves_played >= 3 && !is_good_capture && !is_promotion && !is_in_check)
             {
                 int reduction = 1;
 
-                // if (legal_moves_played >= 6)
-                //     reduction = 2;
+                if (legal_moves_played >= 6)
+                     reduction = 2;
 
                 // 浅く探索する (depth - 1 - reduction)
                 score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1, td);
