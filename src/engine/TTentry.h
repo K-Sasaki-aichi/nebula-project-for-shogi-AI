@@ -34,8 +34,9 @@
         }
 
         // 書き込み用
-        inline void save(uint32_t k,
-          Move32 m,
+        inline void save(
+          uint32_t k,
+          nshogi::core::Move32 m,
           int16_t s,
           int16_t e,
           uint8_t d,

@@ -124,7 +124,8 @@ namespace engine
                 entry->score = score;
                 entry->eval = eval;
                 entry->depth = depth;
-                entry->bound_age = (age << 2) | bound;
+                entry->age = age;
+                entry->bound = bound;
             }
         }
     };
