@@ -6,6 +6,7 @@
 #include "StatewithNNUE.h"
 #include "eval.h"
 #include "TT.h"
+#include "../nshogi/src/io/sfen.h"
 // #include "movepicker.h"
 #include "movepicker2.h"
 #include <algorithm>
@@ -68,6 +69,53 @@ namespace engine
             p[0] = nshogi::core::Move32::MoveNone();
             p[1] = nshogi::core::Move32::MoveNone();
         }
+    }
+
+    inline void extract_and_print_pv(nnue::StatewithNNUE &st, int depth, int score, uint64_t nodes)
+    {
+        std::vector<std::string> pv_str;
+        int moves_made = 0;
+
+        for (int i = 0; i < depth; ++i)
+        {
+            uint64_t hash = st.getHash();
+            TTEntry entry;
+            
+            if (!TT.read(hash, entry) || entry.move == nshogi::core::Move32::MoveNone())
+            {
+                break;
+            }
+
+            nshogi::core::Move32 m = entry.move;
+            
+            // 教えていただいた関数でSFEN/USI形式の文字列に変換
+            pv_str.push_back(nshogi::io::sfen::move32ToSfen(m));
+
+            auto side = st.getSideToMove();
+            if (side == nshogi::core::Color::Black)
+            {
+                st.doMove<nshogi::core::Color::Black>(m);
+            }
+            else
+            {
+                st.doMove<nshogi::core::Color::White>(m);
+            }
+            moves_made++;
+        }
+
+        // 盤面を元に戻す
+        for (int i = 0; i < moves_made; ++i)
+        {
+            st.undoMove();
+        }
+
+        // USI形式での出力
+        std::cout << "info depth " << depth << " nodes " << nodes << " score cp " << score << " pv";
+        for (const auto &s : pv_str)
+        {
+            std::cout << " " << s;
+        }
+        std::cout << std::endl;
     }
 
     template <nshogi::core::Color C>
@@ -148,7 +196,7 @@ namespace engine
     }
 
     template <nshogi::core::Color C, bool allow_null = true>
-    int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply, ThreadData &td)
+    int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply, ThreadData &td,  bool isStore = true)
     {
         td.nodes++;
 
@@ -245,7 +293,7 @@ namespace engine
 
         // NMP
         int R_adaptive = 3 + depth / 6;
-        if (!st.isInCheck() && depth > R_adaptive && allow_null && static_eval >= beta)
+        if (ply > 0 && !st.isInCheck() && depth > R_adaptive && allow_null && static_eval >= beta)
         {
             st.doNullMove();
             int16_t score = -negamax<Oppo, false>(st, depth - 1 - R, -beta, -beta + 1, age, ply + 1, td);
@@ -282,7 +330,6 @@ namespace engine
         MovePicker2<false> moves(state, info);
 
         int legal_moves_played = 0;
-        bool is_in_check = st.isInCheck();
 
         auto mv = moves.next();
         while (mv != nshogi::core::Move32::MoveNone())
@@ -293,10 +340,13 @@ namespace engine
 
             st.doMove<C>(mv);
 
+            // doMoveの後に移動させた。
+            bool is_in_check = st.isInCheck();
+
             int16_t score;
 
             // 簡易LMR
-            if (depth >= 3 && legal_moves_played >= 3 && !is_good_capture && !is_promotion && !is_in_check)
+            if (ply > 0 && depth >= 3 && legal_moves_played >= 3 && !is_good_capture && !is_promotion && !is_in_check)
             {
                 int reduction = 1;
 
@@ -304,7 +354,7 @@ namespace engine
                      reduction = 2;
 
                 // 浅く探索する (depth - 1 - reduction)
-                score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1, td);
+                score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1, td, false);
 
                 // もし浅く読んだ結果が Alpha を超えた場合はフル計算
                 if (!isStop.load(std::memory_order_relaxed) && score > alpha)
@@ -378,7 +428,9 @@ namespace engine
         }
 
         // 静的評価値(eval)は今度考える.
-        TT.store(hash, best_move, best, 0, depth, bound, age);
+        if(isStore){
+            TT.store(hash, best_move, best, 0, depth, bound, age);
+        }
 
         return best;
     }

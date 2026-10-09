@@ -128,7 +128,7 @@ namespace engine
 
         const int depth = 40;
         const int INF = 30000;
-        const int NUM_THREADS = 2;
+        const int NUM_THREADS = 3;
         std::vector<ThreadData> threadData(NUM_THREADS + 1);
         SearchResult result;
 
@@ -296,6 +296,8 @@ namespace engine
             // 反復深化の1つの深さ(i)の探索が終わった直後
             TT.store(hash, result.bestMove, result.score, 0, i, BOUND_EXACT, age);
             // sharedBestMove.store(result.bestMove, std::memory_order_relaxed);
+
+            extract_and_print_pv(st, i + 1, current_best_score, main_td.nodes);
 
             // 終了条件
             if (prev_best_move == result.bestMove)
