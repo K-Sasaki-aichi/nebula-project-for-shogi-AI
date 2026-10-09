@@ -76,7 +76,7 @@ namespace engine
         std::vector<std::string> pv_str;
         int moves_made = 0;
 
-        for (int i = 0; i < depth; ++i)
+        for (int i = 0; i < depth+8; ++i)
         {
             uint64_t hash = st.getHash();
             TTEntry entry;
@@ -138,12 +138,14 @@ namespace engine
             best = stand_pat;
         }
 
-        if (depth == 0)
+        // depth == 0 でも、王手がかかっている場合はすぐに打ち切らずに回避手を生成させる
+        if (depth == 0 && !in_check)
         {
-            return in_check ? alpha : best;
+            return best;
         }
 
         auto &state = st.getState();
+        // 実験でfalseに
         MovePicker2<true> moves(state, nshogi::core::Move32::MoveNone());
 
         int legal_moves_played = 0;
@@ -189,6 +191,12 @@ namespace engine
         if (in_check && legal_moves_played == 0)
         {
             return -INF; // 探索深さ(ply)の概念がqsearchにはないので固定の負けスコアを返す
+        }
+
+        // もし王手中で、depth <= 0 で合法手があった場合のフォールバック
+        if (in_check && legal_moves_played > 0 && best == -INF - 1)
+        {
+            return st.eval<C>(); // または最低限の評価値
         }
 
         // alpha ではなく、実際に見つけたベストスコアを返す
@@ -331,6 +339,8 @@ namespace engine
 
         int legal_moves_played = 0;
 
+        const bool is_in_check = st.isInCheck();
+
         auto mv = moves.next();
         while (mv != nshogi::core::Move32::MoveNone())
         {
@@ -340,13 +350,17 @@ namespace engine
 
             st.doMove<C>(mv);
 
-            // doMoveの後に移動させた。
-            const bool is_in_check = st.isInCheck();
+            const bool gives_check = st.isInCheck();
 
             int16_t score;
 
             // 簡易LMR
-            if (ply > 0 && depth >= 3 && legal_moves_played >= 3 && !is_good_capture && !is_promotion && !is_in_check)
+            if (ply > 0 && depth >= 3 && 
+                legal_moves_played >= 3 && 
+                !is_good_capture && 
+                !is_promotion && 
+                !is_in_check && 
+                !gives_check)
             {
                 int reduction = 1;
 
