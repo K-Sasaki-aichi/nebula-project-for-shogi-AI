@@ -107,11 +107,11 @@ namespace engine
                 break;
             }
 
-            if (!local_best_move.isNone())
-            {
-                // sharedBestMove.store(local_best_move, std::memory_order_relaxed);
-                TT.store(hash, local_best_move, alpha, 0, i, BOUND_EXACT, age);
-            }
+            // if (!local_best_move.isNone())
+            // {
+            //     // sharedBestMove.store(local_best_move, std::memory_order_relaxed);
+            //     TT.store(hash, local_best_move, alpha, 0, i, BOUND_EXACT, age);
+            // }
         }
     }
 

@@ -217,15 +217,15 @@ namespace engine
         switch (repetition)
         {
         case nshogi::core::RepetitionStatus::WinRepetition:
-            return 30000 - ply; // 王手連続の千日手勝ち
+            return 30000; // 王手連続の千日手勝ち
         case nshogi::core::RepetitionStatus::LossRepetition:
-            return -30000 + ply; // 王手連続の千日手負け
+            return -30000; // 王手連続の千日手負け
         case nshogi::core::RepetitionStatus::Repetition:
             return 0; // 通常の千日手
         case nshogi::core::RepetitionStatus::SuperiorRepetition:
-            return 30000 - ply;
+            return 30000;
         case nshogi::core::RepetitionStatus::InferiorRepetition:
-            return -30000 + ply;
+            return -30000;
         default:
             break;
         }
@@ -233,7 +233,7 @@ namespace engine
         // 宣言勝ち
         if (state.canDeclare())
         {
-            return INF - ply;
+            return INF;
         }
 
         if (isStop.load(std::memory_order_relaxed))
@@ -341,7 +341,7 @@ namespace engine
             st.doMove<C>(mv);
 
             // doMoveの後に移動させた。
-            bool is_in_check = st.isInCheck();
+            const bool is_in_check = st.isInCheck();
 
             int16_t score;
 
@@ -407,9 +407,9 @@ namespace engine
             const auto lastMove = state.getLastMove();
             if (lastMove.drop() && lastMove.pieceType() == nshogi::core::PTK_Pawn)
             {
-                return INF - ply;
+                return INF;
             }
-            return -(INF - ply);
+            return -INF;
         }
 
         uint32_t key = static_cast<uint32_t>(hash >> 32);
