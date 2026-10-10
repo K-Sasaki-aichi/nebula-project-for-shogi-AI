@@ -17,7 +17,7 @@ namespace engine
     public:
         TranspositionTable()
         {
-            resize(1024 * 1.5);
+            resize(1024 * 4);
         }
 
         void resize(size_t size_mb)
@@ -76,7 +76,7 @@ namespace engine
             {
                 // 【同じ局面の場合】
                 // 今の探索の方が深い（または同じ）、あるいは同じ深さでもより正確なBoundなら上書き
-                if (depth > entry->depth)
+                if (depth > entry->depth || (depth == entry->depth && bound == BOUND_EXACT))
                 {
                     replace = true;
                 }
@@ -90,7 +90,7 @@ namespace engine
                     replace = true;
                 }
                 // 2. 同じ手番の探索中なら、深さを比較して「今の探索の方が深い（価値が高い）」場合のみ上書き
-                else if (depth > entry->depth)
+                else if (depth >= entry->depth)
                 {
                     replace = true;
                 }

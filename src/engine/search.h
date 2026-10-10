@@ -154,7 +154,7 @@ namespace engine
             tt_move = entry.move;
         }
 
-        MovePicker2<true> moves(state, nshogi::core::Move32::MoveNone());
+        MovePicker2<true> moves(state, tt_move);
 
         int legal_moves_played = 0;
         auto mv = moves.next();
@@ -201,18 +201,12 @@ namespace engine
             return -INF; // 探索深さ(ply)の概念がqsearchにはないので固定の負けスコアを返す
         }
 
-        // もし王手中で、depth <= 0 で合法手があった場合のフォールバック
-        if (in_check && legal_moves_played > 0 && best == -INF - 1)
-        {
-            return st.eval<C>(); // または最低限の評価値
-        }
-
         // alpha ではなく、実際に見つけたベストスコアを返す
         return best;
     }
 
     template <nshogi::core::Color C, bool allow_null = true>
-    int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply, ThreadData &td,  bool isStore = true)
+    int16_t negamax(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int age, int ply, ThreadData &td)
     {
         td.nodes++;
 
@@ -312,7 +306,7 @@ namespace engine
         if (ply > 0 && !st.isInCheck() && depth > R_adaptive && allow_null && static_eval >= beta)
         {
             st.doNullMove();
-            int16_t score = -negamax<Oppo, false>(st, depth - 1 - R, -beta, -beta + 1, age, ply + 1, td);
+            int16_t score = -negamax<Oppo, false>(st, depth - 1 - R_adaptive, -beta, -beta + 1, age, ply + 1, td);
 
             st.undoNullMove();
 
@@ -323,7 +317,9 @@ namespace engine
 
             if (score >= beta)
             {
-                return score >= 20000 ? beta : score;
+                int16_t return_score = score >= 20000 ? beta : score;
+                TT.store(hash, nshogi::core::Move32::MoveNone(), return_score, 0, depth - 1 - R, BOUND_LOWER, age);
+                return return_score;
             }
         }
 
@@ -376,7 +372,7 @@ namespace engine
                      reduction = 2;
 
                 // 浅く探索する (depth - 1 - reduction)
-                score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1, td, false);
+                score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1, td);
 
                 // もし浅く読んだ結果が Alpha を超えた場合はフル計算
                 if (!isStop.load(std::memory_order_relaxed) && score > alpha)
@@ -451,7 +447,7 @@ namespace engine
         }
 
         // 静的評価値(eval)は今度考える.
-        if(isStore){
+        if constexpr(allow_null){
             TT.store(hash, best_move, best, 0, depth, bound, age);
         }
 
