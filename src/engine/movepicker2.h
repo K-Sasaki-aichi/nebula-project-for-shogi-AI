@@ -164,7 +164,8 @@ namespace engine
                     if (!info_.hashMove.isNone() && state_.isLegalMove(C_, info_.hashMove))
                     {
                         if constexpr (isQsearch) {
-                            if (isTactical_(info_.hashMove)) return info_.hashMove;
+                            // 王手されている場合も使用
+                            if (isTactical_(info_.hashMove) || is_in_check_) return info_.hashMove;
                         } else {
                             return info_.hashMove;
                         }
@@ -219,7 +220,7 @@ namespace engine
                 case Stage::Killers:
                 {
                     stage_ = Stage::GenerateQuiets;
-                    if(is_in_check_) break;
+                    //if(is_in_check_) break;
                     // !isCapture_(info_.killer1) は isLegalMoveで判定済みなので消去
                     if (!info_.killer1.isNone() && info_.killer1 != info_.hashMove && 
                         state_.isLegalMove(C_, info_.killer1))

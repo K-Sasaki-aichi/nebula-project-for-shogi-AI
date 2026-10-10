@@ -139,7 +139,7 @@ namespace engine
         }
 
         // depth == 0 でも、王手がかかっている場合はすぐに打ち切らずに回避手を生成させる
-        if (depth == 0 && !in_check)
+        if (depth <= 0 && !in_check)
         {
             return best;
         }
@@ -165,7 +165,7 @@ namespace engine
 
             if (isStop.load(std::memory_order_relaxed))
             {
-                return alpha; // スコアを比較せず、すぐに抜ける
+                return 0; // スコアを比較せず、すぐに抜ける
             }
 
             legal_moves_played++;
@@ -246,7 +246,7 @@ namespace engine
 
         if (isStop.load(std::memory_order_relaxed))
         {
-            return alpha;
+            return 0;
         }
 
         if (depth == 0)
@@ -310,7 +310,7 @@ namespace engine
 
             if (isStop.load(std::memory_order_relaxed))
             {
-                return alpha; // スコアを比較せず、すぐに抜ける
+                return 0; // スコアを比較せず、すぐに抜ける
             }
 
             if (score >= beta)
@@ -385,7 +385,7 @@ namespace engine
 
             if (isStop.load(std::memory_order_relaxed))
             {
-                return alpha; // スコアを比較せず、すぐに抜ける
+                return 0; // スコアを比較せず、すぐに抜ける
             }
 
             legal_moves_played++;
@@ -423,6 +423,7 @@ namespace engine
             {
                 return INF;
             }
+
             return -INF;
         }
 
