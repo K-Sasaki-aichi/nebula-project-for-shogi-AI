@@ -14,8 +14,6 @@ namespace engine
         std::vector<TTEntry> table;
         uint64_t mask;
 
-        mutable std::mutex mtx;
-
     public:
         TranspositionTable()
         {
@@ -39,40 +37,24 @@ namespace engine
             return &table[hash & mask];
         }
 
-        // inline bool read(uint64_t hash, TTEntry &out) const
-        // {
-        //     TTEntry *entry = const_cast<TTEntry *>(&table[hash & mask]);
-
-        //     uint32_t key = static_cast<uint32_t>(hash >> 32);
-
-        //     uint32_t k1 = entry->key;
-        //     if (k1 != key)
-        //         return false;
-
-        //     // コピー
-        //     std::memcpy(&out, entry, sizeof(TTEntry));
-
-        //     uint32_t k2 = entry->key;
-
-        //     // 安全のためにダブルチェック
-        //     if (k1 != k2 || k1 != key)
-        //         return false;
-
-        //     return true;
-        // }
-
         inline bool read(uint64_t hash, TTEntry &out) const
         {
-            std::lock_guard<std::mutex> lock(mtx);
-
             TTEntry *entry = const_cast<TTEntry *>(&table[hash & mask]);
 
             uint32_t key = static_cast<uint32_t>(hash >> 32);
 
-            if (entry->key != key)
+            uint32_t k1 = entry->key;
+            if (k1 != key)
                 return false;
 
+            // コピー
             std::memcpy(&out, entry, sizeof(TTEntry));
+
+            uint32_t k2 = entry->key;
+
+            // 安全のためにダブルチェック
+            if (k1 != k2 || k1 != key)
+                return false;
 
             return true;
         }
@@ -85,9 +67,6 @@ namespace engine
                           Bound bound,
                           uint8_t age)
         {
-            std::lock_guard<std::mutex> lock(mtx);
-
-
             TTEntry *entry = &table[hash & mask];
             uint32_t key = static_cast<uint32_t>(hash >> 32);
 
@@ -119,13 +98,16 @@ namespace engine
 
             if (replace)
             {
-                entry->key = key;
+                entry->key = key ^ 1;
+                
                 entry->move = move;
                 entry->score = score;
                 entry->eval = eval;
                 entry->depth = depth;
                 entry->age = age;
                 entry->bound = bound;
+
+                entry->key = key;
             }
         }
     };

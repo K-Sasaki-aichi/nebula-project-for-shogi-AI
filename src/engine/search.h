@@ -145,7 +145,15 @@ namespace engine
         }
 
         auto &state = st.getState();
-        // 実験でfalseに
+        
+        nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
+        const uint64_t hash = st.getHash();
+        TTEntry entry;
+        if (TT.read(hash, entry))
+        {
+            tt_move = entry.move;
+        }
+
         MovePicker2<true> moves(state, nshogi::core::Move32::MoveNone());
 
         int legal_moves_played = 0;

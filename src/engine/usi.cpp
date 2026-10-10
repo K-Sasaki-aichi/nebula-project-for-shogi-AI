@@ -421,7 +421,7 @@ int main()
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_10_10_4");
+            writeLine("id name nebula_10_10_6");
             writeLine("id author Sasaki, Horiuchi");
             writeLine("usiok");
             continue;
