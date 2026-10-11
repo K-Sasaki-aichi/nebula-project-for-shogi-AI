@@ -76,7 +76,7 @@ namespace engine
         std::vector<std::string> pv_str;
         int moves_made = 0;
 
-        for (int i = 0; i < depth; ++i)
+        for (int i = 0; i < depth+8; ++i)
         {
             uint64_t hash = st.getHash();
             TTEntry entry;
@@ -266,14 +266,11 @@ namespace engine
         int16_t tt_score;
         const uint64_t hash = st.getHash();
         TTEntry entry;
-        nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
 
         //一度実験の為に消す
         //なんでネストになってるの？
         if (TT.read(hash, entry))
         {
-            tt_move = entry.move;
-
             if (entry.depth >= depth)
             {
                 int16_t tt_score = entry.score;
@@ -326,6 +323,13 @@ namespace engine
             }
         }
 
+        // TTから前回の最善手を取得
+        nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
+        if (TT.read(hash, entry))
+        {
+            tt_move = entry.move;
+        }
+
         engine::OrderingInfo info{};
         info.hashMove = tt_move;
 
@@ -346,27 +350,21 @@ namespace engine
         {
             const bool is_capture = (mv.capturePieceType() != nshogi::core::PTK_Empty);
             const bool is_promotion = mv.promote();
-
-            // 1. doMove前にわかる「LMRするかもしれないフラグ」
-            bool do_lmr = (ply > 0 && depth >= 3 && legal_moves_played >= 3 && 
-                           !is_promotion && !is_in_check);
-
-            // 2. LMR候補で、かつ駒取りの場合のみ、重い isGoodCapture を評価して上書き
-            if (do_lmr && is_capture && isGoodCapture(state, mv)) {
-                do_lmr = false; 
-            }
+            const bool is_good_capture = is_capture && isGoodCapture(state, mv);
 
             st.doMove<C>(mv);
 
-            // 3. doMove後、まだLMR候補として残っている場合のみ王手判定
-            if (do_lmr && st.isInCheck()) {
-                do_lmr = false;
-            }
+            const bool gives_check = st.isInCheck();
 
             int16_t score;
 
             // 簡易LMR
-            if (do_lmr)
+            if (ply > 0 && depth >= 3 && 
+                legal_moves_played >= 3 && 
+                !is_good_capture && 
+                !is_promotion && 
+                !is_in_check && 
+                !gives_check)
             {
                 int reduction = 1;
 
