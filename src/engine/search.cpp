@@ -38,6 +38,8 @@ namespace engine
         int start_depth = 1 + (thread_id % 4);
         int step = 1 + (thread_id % 3);
 
+        td.pvLength[0] = 0;
+
         for (int i = start_depth; i < depth; i += step)
         {
             if (isStop.load(std::memory_order_relaxed))
@@ -166,6 +168,7 @@ namespace engine
 
         for (int i = 0; i < depth; i++)
         {
+            main_td.pvLength[0] = 0;
 
             if (isStop.load(std::memory_order_relaxed))
             {
@@ -215,15 +218,8 @@ namespace engine
                     //     break;
                     // }
                     st.doMove<Black>(mv);
-                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0, main_td);
+                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 1, main_td);
 
-                    //######
-// std::cout
-//     << "depth=" << i
-//     << " move=" << static_cast<uint32_t>(mv.value())
-//     << " score=" << score
-//     << '\n';
-                    //######
                     st.undoMove();
 
                     if (isStop.load(std::memory_order_relaxed))
@@ -236,8 +232,17 @@ namespace engine
                         alpha = score;
                         current_best_move = mv;
                         current_best_score = score;
-                        // result.bestMove = mv;
-                        // result.score = score;
+                        
+                        main_td.pvTable[0][0] = mv;
+
+                        int child_len = main_td.pvLength[1];
+
+                        for (int j = 0; j < child_len; ++j){
+                            main_td.pvTable[0][j + 1] =
+                                main_td.pvTable[1][j];
+                        }
+
+                        main_td.pvLength[0] = child_len + 1;
                     }
 
                     mv = moves.next();
@@ -253,15 +258,7 @@ namespace engine
                     //     break;
                     // }
                     st.doMove<White>(mv);
-                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0, main_td);
-
-                    //######
-// std::cout
-//     << "depth=" << i
-//     << " move=" << static_cast<uint32_t>(mv.value())
-//     << " score=" << score
-//     << '\n';
-                    //######
+                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 1, main_td);
 
                     st.undoMove();
                     if (isStop.load(std::memory_order_relaxed))
@@ -274,8 +271,17 @@ namespace engine
                         alpha = score;
                         current_best_move = mv;
                         current_best_score = score;
-                        // result.bestMove = mv;
-                        // result.score = score;
+
+                        main_td.pvTable[0][0] = mv;
+
+                        int child_len = main_td.pvLength[1];
+
+                        for (int j = 0; j < child_len; ++j){
+                            main_td.pvTable[0][j + 1] =
+                                main_td.pvTable[1][j];
+                        }
+
+                        main_td.pvLength[0] = child_len + 1;
                     }
 
                     mv = moves.next();
@@ -291,13 +297,13 @@ namespace engine
 
             result.bestMove = current_best_move;
             result.score = current_best_score;
-            result.depth = i;
+            result.depth = i + 1;
 
             // 反復深化の1つの深さ(i)の探索が終わった直後
             TT.store(hash, result.bestMove, result.score, 0, i, BOUND_EXACT, age);
             // sharedBestMove.store(result.bestMove, std::memory_order_relaxed);
 
-            extract_and_print_pv(st, i + 1, current_best_score, main_td.nodes);
+            print_pv(i + 1, current_best_score, main_td.nodes, main_td);
 
             // 終了条件
             if (prev_best_move == result.bestMove)

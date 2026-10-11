@@ -32,6 +32,8 @@ namespace engine
     // NMP いつまで行うか
     constexpr int R = 3;
 
+    inline constexpr int MaxPly = 256;
+
     // 探索結果を格納する構造体
     struct SearchResult
     {
@@ -44,9 +46,10 @@ namespace engine
     {
         uint64_t nodes = 0;
         bool isMain = false;
-    };
 
-    inline constexpr int MaxPly = 128;
+        nshogi::core::Move32 pvTable[MaxPly][MaxPly];
+        int pvLength[MaxPly];
+    };
 
     using KillerMovePair = ::std::array<nshogi::core::Move32, 2>;
     using KillersTable = ::std::array<KillerMovePair, MaxPly>;
@@ -71,49 +74,12 @@ namespace engine
         }
     }
 
-    inline void extract_and_print_pv(nnue::StatewithNNUE &st, int depth, int score, uint64_t nodes)
+    inline void print_pv(int depth, int score, uint64_t nodes, const ThreadData& td)
     {
-        std::vector<std::string> pv_str;
-        int moves_made = 0;
-
-        for (int i = 0; i < depth+8; ++i)
-        {
-            uint64_t hash = st.getHash();
-            TTEntry entry;
-            
-            if (!TT.read(hash, entry) || entry.move == nshogi::core::Move32::MoveNone())
-            {
-                break;
-            }
-
-            nshogi::core::Move32 m = entry.move;
-            
-            // 教えていただいた関数でSFEN/USI形式の文字列に変換
-            pv_str.push_back(nshogi::io::sfen::move32ToSfen(m));
-
-            auto side = st.getSideToMove();
-            if (side == nshogi::core::Color::Black)
-            {
-                st.doMove<nshogi::core::Color::Black>(m);
-            }
-            else
-            {
-                st.doMove<nshogi::core::Color::White>(m);
-            }
-            moves_made++;
-        }
-
-        // 盤面を元に戻す
-        for (int i = 0; i < moves_made; ++i)
-        {
-            st.undoMove();
-        }
-
-        // USI形式での出力
         std::cout << "info depth " << depth << " nodes " << nodes << " score cp " << score << " pv";
-        for (const auto &s : pv_str)
+        for (int j = 0; j < td.pvLength[0] && j < MaxPly; ++j)
         {
-            std::cout << " " << s;
+            std::cout << " " << nshogi::io::sfen::move32ToSfen(td.pvTable[0][j]);
         }
         std::cout << std::endl;
     }
@@ -210,6 +176,9 @@ namespace engine
     {
         td.nodes++;
 
+        // 途中で終了してもいいように
+        td.pvLength[ply] = 0;
+
         if (td.isMain && (td.nodes & 2047) == 0)
         {
             auto now = std::chrono::steady_clock::now().time_since_epoch();
@@ -227,15 +196,15 @@ namespace engine
         switch (repetition)
         {
         case nshogi::core::RepetitionStatus::WinRepetition:
-            return 30000; // 王手連続の千日手勝ち
+            return INF; // 王手連続の千日手勝ち
         case nshogi::core::RepetitionStatus::LossRepetition:
-            return -30000; // 王手連続の千日手負け
+            return -INF; // 王手連続の千日手負け
         case nshogi::core::RepetitionStatus::Repetition:
             return 0; // 通常の千日手
         case nshogi::core::RepetitionStatus::SuperiorRepetition:
-            return 30000;
+            return INF;
         case nshogi::core::RepetitionStatus::InferiorRepetition:
-            return -30000;
+            return -INF;
         default:
             break;
         }
@@ -318,7 +287,7 @@ namespace engine
             if (score >= beta)
             {
                 int16_t return_score = score >= 20000 ? beta : score;
-                TT.store(hash, nshogi::core::Move32::MoveNone(), return_score, 0, depth - 1 - R, BOUND_LOWER, age);
+                TT.store(hash, nshogi::core::Move32::MoveNone(), return_score, 0, depth - 1 - R_adaptive, BOUND_LOWER, age);
                 return return_score;
             }
         }
@@ -400,7 +369,18 @@ namespace engine
                 best_move = mv;
             }
 
-            alpha = std::max(alpha, best);
+            if(score > alpha){
+                alpha = score;
+
+                td.pvTable[ply][0] = mv;
+                int child_len = td.pvLength[ply + 1];
+                for(int j = 0; j < child_len; j++){
+                    td.pvTable[ply][j + 1] = td.pvTable[ply + 1][j];
+                }
+                td.pvLength[ply] = child_len + 1;
+            }
+
+            //alpha = std::max(alpha, best);
             if (alpha >= beta)
             {
                 if (0 <= ply && ply < engine::MaxPly)
