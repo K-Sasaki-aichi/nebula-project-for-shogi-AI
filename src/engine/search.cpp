@@ -130,7 +130,7 @@ namespace engine
 
         const int depth = 40;
         const int INF = 30000;
-        const int NUM_THREADS = 4;
+        const int NUM_THREADS = 0;
         std::vector<ThreadData> threadData(NUM_THREADS + 1);
         SearchResult result;
 
@@ -329,18 +329,37 @@ namespace engine
 
         isStop.store(false);
 
-        std::cout << "nodes:" << main_td.nodes << std::endl;
-        // think_time が 0 の場合に備える
+        // 全スレッドの探索ノード数を合算
+        uint64_t total_nodes = 0;
+        for (const auto& td : threadData)
+        {
+            total_nodes += td.nodes;
+        }
+
+        std::cout << "nodes:" << total_nodes << std::endl;
+
         if (think_time > 0)
         {
-            double nps = (double)main_td.nodes / ((double)think_time / 1000.0);
-            std::cout << "nps:" << (long long)nps << std::endl;
+            double nps = static_cast<double>(total_nodes) / (static_cast<double>(think_time) / 1000.0);
+            std::cout << "nps:" << static_cast<long long>(nps) << std::endl;
         }
         else
         {
-            // 1ms未満の場合は測定不能として出すか、前回の値を出す
             std::cout << "nps:0 (too fast)" << std::endl;
         }
+
+        // std::cout << "nodes:" << main_td.nodes << std::endl;
+        // // think_time が 0 の場合に備える
+        // if (think_time > 0)
+        // {
+        //     double nps = (double)main_td.nodes / ((double)think_time / 1000.0);
+        //     std::cout << "nps:" << (long long)nps << std::endl;
+        // }
+        // else
+        // {
+        //     // 1ms未満の場合は測定不能として出すか、前回の値を出す
+        //     std::cout << "nps:0 (too fast)" << std::endl;
+        // }
 
         return result;
     }

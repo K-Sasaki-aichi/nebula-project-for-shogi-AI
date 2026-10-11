@@ -91,11 +91,12 @@ namespace engine
         bool in_check = st.isInCheck();
 
         int16_t best = -INF - 1;
+        int16_t stand_pat = -INF - 1;
 
         // 王手されていない時のみ stand_pat の評価とカットを行う
         if (!in_check)
         {
-            int16_t stand_pat = st.eval<C>(); // または nnue::eval::eval<C>(st)
+            stand_pat = st.eval<C>(); // または nnue::eval::eval<C>(st)
             if (stand_pat >= beta)
             {
                 return stand_pat;
@@ -131,6 +132,22 @@ namespace engine
             // {
             //     return alpha;
             // }
+
+            if (!in_check){
+                const auto cap = mv.capturePieceType();
+                if (cap != nshogi::core::PTK_Empty)
+                {
+                    // 「現在の評価値 + 取る駒の価値 + (マージン)」
+                    int16_t futility_value = stand_pat + pieceValue(cap) + 400;
+
+                    // それでも alpha 以下にしかならないなら、絶対に alpha を更新できないためスキップ
+                    if (futility_value <= alpha)
+                    {
+                        mv = moves.next();
+                        continue; // doMoveせずに次の手へ！
+                    }
+                }
+            }
 
             st.doMove<C>(mv);
             int16_t score = -qsearch<~C>(st, depth - 1, -beta, -alpha, ply + 1, td);
@@ -235,11 +252,14 @@ namespace engine
         int16_t tt_score;
         const uint64_t hash = st.getHash();
         TTEntry entry;
+        nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
 
         //一度実験の為に消す
         //なんでネストになってるの？
         if (TT.read(hash, entry))
         {
+            tt_move = entry.move;
+
             if (entry.depth >= depth)
             {
                 int16_t tt_score = entry.score;
@@ -294,13 +314,6 @@ namespace engine
                 TT.store(hash, nshogi::core::Move32::MoveNone(), return_score, 0, depth - 1 - R_adaptive, BOUND_LOWER, age);
                 return return_score;
             }
-        }
-
-        // TTから前回の最善手を取得
-        nshogi::core::Move32 tt_move = nshogi::core::Move32::MoveNone();
-        if (TT.read(hash, entry))
-        {
-            tt_move = entry.move;
         }
 
         engine::OrderingInfo info{};
