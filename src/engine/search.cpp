@@ -208,6 +208,8 @@ namespace engine
 
             auto mv = moves.next();
 
+            bool is_first_move = true;
+
             switch (side)
             {
             case Black:
@@ -218,7 +220,21 @@ namespace engine
                     //     break;
                     // }
                     st.doMove<Black>(mv);
-                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 1, main_td);
+
+                    int16_t score;
+
+                    if(is_first_move){
+                        // 1手目はフルウィンドウ
+                        score = -negamax<White>(st, i, -INF, -alpha, age, 1, main_td);
+                        is_first_move = false;
+                    } else {
+                        // 2手目以降はNull Window
+                        score = -negamax<White>(st, i, -alpha - 1, -alpha, age, 1, main_td);
+                        // 予想が外れて良さそうな場合はフルウィンドウで再探索
+                        if (score > alpha && score < beta){
+                            score = -negamax<White>(st, i, -INF, -alpha, age, 1, main_td);
+                        }
+                    }
 
                     st.undoMove();
 

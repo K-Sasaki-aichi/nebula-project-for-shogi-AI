@@ -344,31 +344,44 @@ namespace engine
 
             int16_t score;
 
-            // 簡易LMR
-            if (ply > 0 && depth >= 3 && 
-                legal_moves_played >= 3 && 
-                !is_good_capture && 
-                !is_promotion && 
-                !is_in_check && 
-                !gives_check)
-            {
-                int reduction = 1;
+            // PVS
+            if(legal_moves_played == 0){
+                // １手目はフルウィンドウ
+                score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1, td);
+            } else {
+                // 簡易LMR
+                if (ply > 0 && depth >= 3 && 
+                    legal_moves_played >= 3 && 
+                    !is_good_capture && 
+                    !is_promotion && 
+                    !is_in_check && 
+                    !gives_check)
+                {
+                    int reduction = 1;
 
-                if (legal_moves_played >= 6)
-                     reduction = 2;
+                    if (legal_moves_played >= 6)
+                        reduction = 2;
 
-                // 浅く探索する (depth - 1 - reduction)
-                score = -negamax<Oppo>(st, depth - 1 - reduction, -beta, -alpha, age, ply + 1, td);
+                    // 浅く探索する (depth - 1 - reduction)
+                    score = -negamax<Oppo>(st, depth - 1 - reduction, -alpha - 1, -alpha, age, ply + 1, td);
 
-                // もし浅く読んだ結果が Alpha を超えた場合はフル計算
-                if (!isStop.load(std::memory_order_relaxed) && score > alpha)
+                    // もし浅く読んだ結果が Alpha を超えた場合はフル計算
+                    if (!isStop.load(std::memory_order_relaxed) && score > alpha)
+                    {
+                        score = -negamax<Oppo>(st, depth - 1, -alpha - 1, -alpha, age, ply + 1, td);
+                    }
+                }
+                else
+                {
+                    score = -negamax<Oppo>(st, depth - 1, -alpha - 1, -alpha, age, ply + 1, td);
+                }
+
+                // 2. Null Window探索の結果、1手目より良いスコア(score > alpha)が出た場合
+                // かつ、ベータカットの基準値(beta)には届いていない場合、フルウィンドウで再探索して正確な値を測る
+                if (score > alpha && score < beta && !isStop.load(std::memory_order_relaxed))
                 {
                     score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1, td);
                 }
-            }
-            else
-            {
-                score = -negamax<Oppo>(st, depth - 1, -beta, -alpha, age, ply + 1, td);
             }
 
             st.undoMove();
