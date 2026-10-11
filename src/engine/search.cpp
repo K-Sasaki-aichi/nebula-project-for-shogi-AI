@@ -130,7 +130,7 @@ namespace engine
 
         const int depth = 40;
         const int INF = 30000;
-        const int NUM_THREADS = 3;
+        const int NUM_THREADS = 4;
         std::vector<ThreadData> threadData(NUM_THREADS + 1);
         SearchResult result;
 

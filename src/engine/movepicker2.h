@@ -119,6 +119,11 @@ namespace engine
               thread_id_(0) // 個別に初期化
         {
             is_in_check_ = state_.isInCheck();
+
+            if (is_in_check_) {
+                info_.killer1 = ::nshogi::core::Move32::MoveNone();
+                info_.killer2 = ::nshogi::core::Move32::MoveNone();
+            }
         }
 
         // コンストラクタ2: thread_idあり
@@ -129,6 +134,11 @@ namespace engine
               thread_id_(id) // 個別に初期化
         {
             is_in_check_ = state_.isInCheck();
+
+            if (is_in_check_) {
+                info_.killer1 = ::nshogi::core::Move32::MoveNone();
+                info_.killer2 = ::nshogi::core::Move32::MoveNone();
+            }
         }
 
         // コンストラクタ3: hashMoveのみ (thread_id 0)

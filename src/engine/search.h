@@ -85,7 +85,7 @@ namespace engine
     }
 
     template <nshogi::core::Color C>
-    int16_t qsearch(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, ThreadData &td)
+    int16_t qsearch(nnue::StatewithNNUE &st, int depth, int16_t alpha, int16_t beta, int ply, ThreadData &td)
     {
         td.nodes++;
         bool in_check = st.isInCheck();
@@ -133,7 +133,7 @@ namespace engine
             // }
 
             st.doMove<C>(mv);
-            int16_t score = -qsearch<~C>(st, depth - 1, -beta, -alpha, td);
+            int16_t score = -qsearch<~C>(st, depth - 1, -beta, -alpha, ply + 1, td);
 
             st.undoMove();
 
@@ -164,7 +164,7 @@ namespace engine
         // 王手されていて、合法な回避手が1つもなかった場合は「詰み」
         if (in_check && legal_moves_played == 0)
         {
-            return -INF; // 探索深さ(ply)の概念がqsearchにはないので固定の負けスコアを返す
+            return -INF + ply;
         }
 
         // alpha ではなく、実際に見つけたベストスコアを返す
@@ -196,15 +196,15 @@ namespace engine
         switch (repetition)
         {
         case nshogi::core::RepetitionStatus::WinRepetition:
-            return INF; // 王手連続の千日手勝ち
+            return INF - ply; // 王手連続の千日手勝ち
         case nshogi::core::RepetitionStatus::LossRepetition:
-            return -INF; // 王手連続の千日手負け
+            return -INF + ply; // 王手連続の千日手負け
         case nshogi::core::RepetitionStatus::Repetition:
             return 0; // 通常の千日手
         case nshogi::core::RepetitionStatus::SuperiorRepetition:
-            return INF;
+            return INF - ply;
         case nshogi::core::RepetitionStatus::InferiorRepetition:
-            return -INF;
+            return -INF + ply;
         default:
             break;
         }
@@ -212,7 +212,7 @@ namespace engine
         // 宣言勝ち
         if (state.canDeclare())
         {
-            return INF;
+            return INF - ply;
         }
 
         if (isStop.load(std::memory_order_relaxed))
@@ -222,7 +222,7 @@ namespace engine
 
         if (depth == 0)
         {
-            return qsearch<C>(st, 50, alpha, beta, td);
+            return qsearch<C>(st, 50, alpha, beta, ply, td);
         }
 
         nshogi::core::Move32 best_move = nshogi::core::Move32::MoveNone();
@@ -244,6 +244,10 @@ namespace engine
             {
                 int16_t tt_score = entry.score;
                 Bound bound = entry.getBound();
+
+                // ハッシュで取るときに詰みの場合を考える
+                if(tt_score > 29000) tt_score -= ply;
+                else if(tt_score < -29000) tt_score += ply;
 
                 if (bound == BOUND_EXACT)
                     return tt_score;
@@ -405,10 +409,10 @@ namespace engine
             const auto lastMove = state.getLastMove();
             if (lastMove.drop() && lastMove.pieceType() == nshogi::core::PTK_Pawn)
             {
-                return INF;
+                return INF - ply;
             }
 
-            return -INF;
+            return -INF + ply;
         }
 
         uint32_t key = static_cast<uint32_t>(hash >> 32);
@@ -426,9 +430,13 @@ namespace engine
             bound = BOUND_EXACT; // PV Node
         }
 
+        int16_t store_score = best;
+        if (store_score > 29000) store_score += ply;
+        else if (store_score < -29000) store_score -= ply;
+
         // 静的評価値(eval)は今度考える.
         if constexpr(allow_null){
-            TT.store(hash, best_move, best, 0, depth, bound, age);
+            TT.store(hash, best_move, store_score, 0, depth, bound, age);
         }
 
         return best;
