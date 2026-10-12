@@ -130,7 +130,7 @@ namespace engine
 
         const int depth = 40;
         const int INF = 30000;
-        const int NUM_THREADS = 0;
+        const int NUM_THREADS = 5;
         std::vector<ThreadData> threadData(NUM_THREADS + 1);
         SearchResult result;
 
@@ -191,135 +191,183 @@ namespace engine
             int16_t alpha = -INF;
             int16_t beta = INF;
 
-            // add: この深さ(i)での最善手を一時的に保持する変数
-            nshogi::core::Move32 current_best_move = nshogi::core::Move32::MoveNone();
-            int16_t current_best_score = -INF;
+            int16_t window_alpha = -INF;
+            int16_t window_beta = INF;
+            int delta = 400;
 
-            nshogi::core::Move32 tt_move = result.bestMove;
-
-            TTEntry entry;
-
-            if (tt_move == nshogi::core::Move32::MoveNone() && TT.read(hash, entry))
-            {
-                tt_move = entry.move;
+            if (i >= 4) {
+                window_alpha = std::max(static_cast<int>(-INF), prev_score - delta);
+                window_beta = std::min(static_cast<int>(INF), prev_score + delta);
             }
 
-            MovePicker2<false> moves(st.getState(), tt_move);
+            nshogi::core::Move32 current_best_move;
+            int16_t current_best_score;
 
-            auto mv = moves.next();
+            // 窓が外れたとき用の再探索
+            while(true){
+                int16_t alpha = window_alpha;
+                int16_t beta = window_beta;
 
-            bool is_first_move = true;
+                // add: この深さ(i)での最善手を一時的に保持する変数
+                current_best_move = nshogi::core::Move32::MoveNone();
+                current_best_score = -INF;
 
-            switch (side)
-            {
-            case Black:
-                while (mv != nshogi::core::Move32::MoveNone())
+                nshogi::core::Move32 tt_move = result.bestMove;
+
+                TTEntry entry;
+
+                if (tt_move == nshogi::core::Move32::MoveNone() && TT.read(hash, entry))
                 {
-                    // if (isStop.load(std::memory_order_relaxed))
-                    // {
-                    //     break;
-                    // }
-                    st.doMove<Black>(mv);
+                    tt_move = entry.move;
+                }
 
-                    int16_t score;
+                MovePicker2<false> moves(st.getState(), tt_move);
 
-                    if(is_first_move){
-                        // 1手目はフルウィンドウ
-                        score = -negamax<White>(st, i, -INF, -alpha, age, 1, main_td);
-                        is_first_move = false;
-                    } else {
-                        // 2手目以降はNull Window
-                        score = -negamax<White>(st, i, -alpha - 1, -alpha, age, 1, main_td);
-                        // 予想が外れて良さそうな場合はフルウィンドウで再探索
-                        if (score > alpha && score < beta){
-                            score = -negamax<White>(st, i, -INF, -alpha, age, 1, main_td);
+                auto mv = moves.next();
+
+                bool is_first_move = true;
+            
+                switch (side)
+                {
+                case Black:
+                    while (mv != nshogi::core::Move32::MoveNone())
+                    {
+                        // if (isStop.load(std::memory_order_relaxed))
+                        // {
+                        //     break;
+                        // }
+                        st.doMove<Black>(mv);
+
+                        int16_t score;
+
+                        if(is_first_move){
+                            // 1手目はフルウィンドウ
+                            // アスピレーションで-betaから
+                            score = -negamax<White>(st, i, -beta, -alpha, age, 1, main_td);
+                            is_first_move = false;
+                        } else {
+                            // 2手目以降はNull Window
+                            score = -negamax<White>(st, i, -alpha - 1, -alpha, age, 1, main_td);
+                            // 予想が外れて良さそうな場合はフルウィンドウで再探索
+                            if (score > alpha && score < beta){
+                                //アスピレーションで-betaから
+                                score = -negamax<White>(st, i, -beta, -alpha, age, 1, main_td);
+                            }
                         }
+
+                        st.undoMove();
+
+                        if (isStop.load(std::memory_order_relaxed)) break;
+
+                        if(score > current_best_score){
+                            current_best_score = score;
+                            current_best_move = mv;
+                        }
+
+                        if (score > alpha){
+                            alpha = score;
+                            
+                            main_td.pvTable[0][0] = mv;
+
+                            int child_len = main_td.pvLength[1];
+                            for (int j = 0; j < child_len; ++j){
+                                main_td.pvTable[0][j + 1] = main_td.pvTable[1][j];
+                            }
+
+                            main_td.pvLength[0] = child_len + 1;
+                        }
+
+                        if (alpha >= beta) break;
+
+                        mv = moves.next();
                     }
 
-                    st.undoMove();
+                    break;
 
-                    if (isStop.load(std::memory_order_relaxed))
+                default:
+                    while (mv != nshogi::core::Move32::MoveNone())
                     {
-                        break;
-                    }
-
-                    if (score > alpha)
-                    {
-                        alpha = score;
-                        current_best_move = mv;
-                        current_best_score = score;
+                        // if (isStop.load(std::memory_order_relaxed))
+                        // {
+                        //     break;
+                        // }
+                        st.doMove<White>(mv);
                         
-                        main_td.pvTable[0][0] = mv;
+                        int16_t score;
 
-                        int child_len = main_td.pvLength[1];
-
-                        for (int j = 0; j < child_len; ++j){
-                            main_td.pvTable[0][j + 1] =
-                                main_td.pvTable[1][j];
+                        if(is_first_move){
+                            // 1手目はフルウィンドウ
+                            score = -negamax<Black>(st, i, -beta, -alpha, age, 1, main_td);
+                            is_first_move = false;
+                        } else {
+                            // 2手目以降はNull Window
+                            score = -negamax<Black>(st, i, -alpha - 1, -alpha, age, 1, main_td);
+                            // 予想が外れて良さそうな場合はフルウィンドウで再探索
+                            if (score > alpha && score < beta){
+                                score = -negamax<Black>(st, i, -beta, -alpha, age, 1, main_td);
+                            }
                         }
 
-                        main_td.pvLength[0] = child_len + 1;
-                    }
+                        st.undoMove();
 
-                    mv = moves.next();
-                }
+                        if (isStop.load(std::memory_order_relaxed)) break;
 
-                break;
-
-            default:
-                while (mv != nshogi::core::Move32::MoveNone())
-                {
-                    // if (isStop.load(std::memory_order_relaxed))
-                    // {
-                    //     break;
-                    // }
-                    st.doMove<White>(mv);
-                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 1, main_td);
-
-                    st.undoMove();
-                    if (isStop.load(std::memory_order_relaxed))
-                    {
-                        break;
-                    }
-
-                    if (score > alpha)
-                    {
-                        alpha = score;
-                        current_best_move = mv;
-                        current_best_score = score;
-
-                        main_td.pvTable[0][0] = mv;
-
-                        int child_len = main_td.pvLength[1];
-
-                        for (int j = 0; j < child_len; ++j){
-                            main_td.pvTable[0][j + 1] =
-                                main_td.pvTable[1][j];
+                        if (score > current_best_score){
+                            current_best_score = score;
+                            current_best_move = mv;
                         }
 
-                        main_td.pvLength[0] = child_len + 1;
+                        if (score > alpha)
+                        {
+                            alpha = score;
+
+                            main_td.pvTable[0][0] = mv;
+                            int child_len = main_td.pvLength[1];
+                            for (int j = 0; j < child_len; ++j){
+                                main_td.pvTable[0][j + 1] = main_td.pvTable[1][j];
+                            }
+
+                            main_td.pvLength[0] = child_len + 1;
+                        }
+
+                        if(alpha >= beta) break;
+
+                        mv = moves.next();
                     }
 
-                    mv = moves.next();
+                    break;
                 }
 
-                break;
+                if(isStop.load(std::memory_order_relaxed)) break;
+
+                // ▼ アスピレーションウィンドウの再判定 ▼
+                // 予想より悪かった（Fail-Low）→ 下限を広げて再探索
+                if (current_best_score <= window_alpha && window_alpha > -INF) {
+                    window_alpha = std::max(static_cast<int>(-INF), window_alpha - delta);
+                    delta += delta / 2; // 次のために窓を大きくしておく
+                    continue; 
+                }
+                // 予想より良かった（Fail-High）→ 上限を広げて再探索
+                else if (current_best_score >= window_beta && window_beta < INF) {
+                    window_beta = std::min(static_cast<int>(INF), window_beta + delta);
+                    delta += delta / 2;
+                    continue; 
+                }
+
+                // 窓の中にスコアが収まったら、この深さの最善手が確定！
+                result.bestMove = current_best_move;
+                result.score = current_best_score;
+                result.depth = i + 1;
+                break; // while(true) を抜ける
             }
 
-            if (isStop.load(std::memory_order_relaxed))
-            {
-                break;
-            }
-
-            result.bestMove = current_best_move;
-            result.score = current_best_score;
-            result.depth = i + 1;
+            if (isStop.load(std::memory_order_relaxed)) break;
 
             // 反復深化の1つの深さ(i)の探索が終わった直後
             TT.store(hash, result.bestMove, result.score, 0, i, BOUND_EXACT, age);
             // sharedBestMove.store(result.bestMove, std::memory_order_relaxed);
 
-            print_pv(i + 1, current_best_score, main_td.nodes, main_td);
+            print_pv(i + 1, result.score, main_td.nodes, main_td);
 
             // 終了条件
             if (prev_best_move == result.bestMove)
