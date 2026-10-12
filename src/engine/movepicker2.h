@@ -63,7 +63,7 @@ namespace engine
         return value_diff >= -200; 
     }
 
-    inline constexpr int highPromotionBonus(const ::nshogi::core::Move32 &) noexcept
+    inline constexpr int highPromotionBonus(const ::nshogi::core::Move32 mv) noexcept
     {
         return 0;
     }
@@ -73,6 +73,8 @@ namespace engine
         ::nshogi::core::Move32 hashMove = ::nshogi::core::Move32::MoveNone();
         ::nshogi::core::Move32 killer1 = ::nshogi::core::Move32::MoveNone();
         ::nshogi::core::Move32 killer2 = ::nshogi::core::Move32::MoveNone();
+
+        const int (*history)[81] = nullptr;
     };
 
 #if __has_include("engine/TT.h")
@@ -293,20 +295,36 @@ namespace engine
             int score;
         };
 
+        int getHistoryScore_(nshogi::core::Move32 mv) const noexcept{
+            if(info_.history == nullptr) return 0;
+
+            int pt = static_cast<int>(mv.pieceType());
+
+            // 手番によるオフセットを加算（先手=0, 後手=16）
+            int color_offset = (C_ == ::nshogi::core::Color::White) ? 16 : 0;
+            int piece_idx = pt + color_offset;
+
+            // 3. 移動先のマスを 0〜80 の数値として取得
+            int to_idx = static_cast<int>(mv.to());
+
+            // 4. テーブルからスコアを引いて返す
+            return info_.history[piece_idx][to_idx];
+        }
+
         static constexpr ::std::size_t MaxMoves = 600;
 
-        static constexpr bool isCapture_(const ::nshogi::core::Move32 &mv) noexcept
+        static constexpr bool isCapture_(const ::nshogi::core::Move32 mv) noexcept
         {
             using namespace ::nshogi::core;
             return mv.capturePieceType() != PTK_Empty;
         }
 
-        static constexpr bool isTactical_(const ::nshogi::core::Move32 &mv) noexcept
+        static constexpr bool isTactical_(const ::nshogi::core::Move32 mv) noexcept
         {
             return isCapture_(mv) || mv.promote();
         }
 
-        int scoreCapture_(const ::nshogi::core::Move32 &mv) const noexcept
+        int scoreCapture_(const ::nshogi::core::Move32 mv) const noexcept
         {
             using namespace ::nshogi::core;
 
@@ -351,8 +369,26 @@ namespace engine
         }
 
         ::nshogi::core::Move32 pickNextQuiet_() noexcept {
-            if(quiet_idx_ >= quiet_count_)
+            if (quiet_idx_ >= quiet_count_)
                 return ::nshogi::core::Move32::MoveNone();
+
+            // 未探索の中で最もスコアの高い手を探す
+            ::std::size_t bestIndex = quiet_idx_;
+            int bestScore = quiets_[quiet_idx_].score;
+            
+            for (::std::size_t i = quiet_idx_ + 1; i < quiet_count_; ++i)
+            {
+                const int s = quiets_[i].score;
+                if (s > bestScore)
+                {
+                    bestScore = s;
+                    bestIndex = i;
+                }
+            }
+
+            // 先頭(quiet_idx_)とSwap
+            if (bestIndex != quiet_idx_)
+                ::std::swap(quiets_[quiet_idx_], quiets_[bestIndex]);
 
             return quiets_[quiet_idx_++].move;
         }
@@ -401,13 +437,13 @@ namespace engine
                 if (!info_.killer2.isNone() && mv == info_.killer2)
                     continue;
 
-                quiets_[quiet_count_++] = ScoredMove{mv, 0};
+                quiets_[quiet_count_++] = ScoredMove{mv, getHistoryScore_(mv)};
             }
 
-            if (thread_id_ > 0 && quiet_count_ > 1) {
-                std::size_t shift = static_cast<std::size_t>(thread_id_) % quiet_count_;
-                std::rotate(quiets_, quiets_ + shift, quiets_ + quiet_count_);
-            } 
+            // if (thread_id_ > 0 && quiet_count_ > 1) {
+            //     std::size_t shift = static_cast<std::size_t>(thread_id_) % quiet_count_;
+            //     std::rotate(quiets_, quiets_ + shift, quiets_ + quiet_count_);
+            // } 
         }
 
         enum class Stage

@@ -197,7 +197,7 @@ public:
         }
 
     template <nshogi::core::Color Us>
-    void doMove(const nshogi::core::Move32& M){
+    void doMove(const nshogi::core::Move32 M){
         using namespace nshogi::core;
         
         StateInfo* prev_info = st;
@@ -425,7 +425,7 @@ public:
 
     // moveの後に行う
     template <Color Us>
-    void updateIncremental(const nshogi::core::Move32& M){
+    void updateIncremental(const nshogi::core::Move32 M){
         using namespace nshogi::core;
 
         auto& acc = st->acc;
@@ -527,7 +527,7 @@ public:
     }
 
     template <Color Us>
-    void updateIncrementalCaptureOnly(const nshogi::core::Move32& M, PieceTypeKind capturedType){
+    void updateIncrementalCaptureOnly(const nshogi::core::Move32 M, PieceTypeKind capturedType){
         auto& acc = st->acc;
 
         const Square sq_zero = static_cast<Square>(0);

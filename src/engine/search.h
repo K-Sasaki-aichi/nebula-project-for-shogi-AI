@@ -49,6 +49,23 @@ namespace engine
 
         nshogi::core::Move32 pvTable[MaxPly][MaxPly];
         int pvLength[MaxPly];
+
+        // ヒストリーヒューリスティック用の配列
+        // [Piece][To]
+        int history_table[32][81] = {{0}};
+
+        void update_history(nshogi::core::Move32 move, int bonus, nshogi::core::Color C){
+            int pt = static_cast<int>(move.pieceType());
+            int color_offset = (C == nshogi::core::Color::White) ? 16 : 0;
+            int piece_idx = pt + color_offset;
+            int to_idx = static_cast<int>(move.to());
+
+            constexpr int HISTORY_MAX = 16384;
+            int& score = history_table[piece_idx][to_idx];
+
+            score -= score * std::abs(bonus) / HISTORY_MAX;
+            score += bonus;
+        }
     };
 
     using KillerMovePair = ::std::array<nshogi::core::Move32, 2>;
@@ -318,6 +335,7 @@ namespace engine
 
         engine::OrderingInfo info{};
         info.hashMove = tt_move;
+        info.history = td.history_table;
 
         if (0 <= ply && ply < engine::MaxPly)
         {
@@ -331,6 +349,9 @@ namespace engine
 
         const bool is_in_check = st.isInCheck();
 
+        nshogi::core::Move32 quiet_moves_tried[64];
+        int quiet_count = 0;
+
         auto mv = moves.next();
         while (mv != nshogi::core::Move32::MoveNone())
         {
@@ -338,6 +359,11 @@ namespace engine
             const bool is_promotion = mv.promote();
             const bool is_good_capture = is_capture && isGoodCapture(state, mv);
 
+            const bool is_quiet = !is_capture && !is_promotion;
+            if(is_quiet && quiet_count < 64){
+                quiet_moves_tried[quiet_count++] = mv;
+            }
+            
             st.doMove<C>(mv);
 
             const bool gives_check = st.isInCheck();
@@ -399,20 +425,10 @@ namespace engine
                 best_move = mv;
             }
 
-            if(score > alpha){
-                alpha = score;
-
-                td.pvTable[ply][0] = mv;
-                int child_len = td.pvLength[ply + 1];
-                for(int j = 0; j < child_len; j++){
-                    td.pvTable[ply][j + 1] = td.pvTable[ply + 1][j];
-                }
-                td.pvLength[ply] = child_len + 1;
-            }
-
             //alpha = std::max(alpha, best);
-            if (alpha >= beta)
+            if (best >= beta)
             {
+                // キラーの更新
                 if (0 <= ply && ply < engine::MaxPly)
                 {
                     const bool is_capture = (best_move.capturePieceType() != nshogi::core::PTK_Empty);
@@ -422,7 +438,31 @@ namespace engine
                         engine::killers[ply][0] = best_move;
                     }
                 }
+
+                if(is_quiet){
+                    // あまり大きくなり過ぎないようにキャップ
+                    int bonus = std::min(depth * depth, 400);
+
+                    // ヒストリーの更新
+                    td.update_history(best_move, bonus, C);
+
+                    for(int i = 0; i < quiet_count-1; i++){
+                        td.update_history(quiet_moves_tried[i], -bonus, C);
+                    }
+                }
+
                 break;
+            }
+
+            if(score > alpha){
+                alpha = score;
+
+                td.pvTable[ply][0] = mv;
+                int child_len = td.pvLength[ply + 1];
+                for(int j = 0; j < child_len; j++){
+                    td.pvTable[ply][j + 1] = td.pvTable[ply + 1][j];
+                }
+                td.pvLength[ply] = child_len + 1;
             }
 
             mv = moves.next();
