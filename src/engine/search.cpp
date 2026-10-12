@@ -193,7 +193,7 @@ namespace engine
 
             int16_t window_alpha = -INF;
             int16_t window_beta = INF;
-            int delta = 400;
+            int delta = 300;
 
             if (i >= 4) {
                 window_alpha = std::max(static_cast<int>(-INF), prev_score - delta);
