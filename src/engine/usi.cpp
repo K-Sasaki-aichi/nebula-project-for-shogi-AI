@@ -421,8 +421,9 @@ int main()
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_10_13");
+            writeLine("id name nebula_10_13_hash");
             writeLine("id author Sasaki, Horiuchi");
+            writeLine("option name USI_Hash type spin default 4096 min 16 max 131072");
             writeLine("usiok");
             continue;
         }
@@ -435,8 +436,59 @@ int main()
             continue;
         }
 
-        if (cmd == "setoption")
+        if (cmd == "setoption"){
+            stopAndJoinSearchThreadIfAny();
+            
+            std::string name = "";
+            std::string value = "";
+            bool parsing_name = false;
+            bool parsing_value = false;
+
+            for (size_t i = 1; i < tokens.size(); ++i)
+            {
+                if (tokens[i] == "name")
+                {
+                    parsing_name = true;
+                    parsing_value = false;
+                }
+                else if (tokens[i] == "value")
+                {
+                    parsing_name = false;
+                    parsing_value = true;
+                }
+                else
+                {
+                    if (parsing_name)
+                    {
+                        if (!name.empty()) name += " ";
+                        name += tokens[i];
+                    }
+                    else if (parsing_value)
+                    {
+                        if (!value.empty()) value += " ";
+                        value += tokens[i];
+                    }
+                }
+            }
+
+            // USI標準は "USI_Hash" だが、念のためチェス由来の "Hash" にも対応
+            if (name == "USI_Hash" || name == "Hash")
+            {
+                try
+                {
+                    int hashSizeMb = std::stoi(value);
+                    engine::TT.resize(hashSizeMb);
+                    // ログ出力（不要であれば削除してください）
+                    sendInfoString("Hash size resized to " + std::to_string(hashSizeMb) + " MB");
+                }
+                catch (const std::exception &)
+                {
+                    // パース失敗時などは無視
+                }
+            }
+
             continue;
+        }
 
         if (cmd == "usinewgame")
         {
