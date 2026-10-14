@@ -89,6 +89,8 @@ namespace
 
         // guarded by g_usi_io_mutex
         std::string bestmove = "resign";
+        std::string pondermove = "";
+        int think_time = 0;
     };
 
     SearchController g_search;
@@ -111,11 +113,22 @@ namespace
         }
 
         std::string best;
+        std::string ponder;
         {
             std::lock_guard<std::mutex> lock(g_usi_io_mutex);
             best = g_search.bestmove;
+            ponder = g_search.pondermove;
         }
-        writeLine("bestmove " + best);
+
+        // ponder手が存在すれば "bestmove XXXX ponder YYYY" の形式で出力
+        if (!ponder.empty() && ponder != "none" && ponder != "resign")
+        {
+            writeLine("bestmove " + best + " ponder " + ponder);
+        }
+        else
+        {
+            writeLine("bestmove " + best);
+        }
     }
 
     void tryPublishBestmove()
@@ -275,28 +288,53 @@ namespace
         int winc = 0;
         int byoyomi = 0;
         int movetime = -1;
+        bool ponder = false;
 
-        for (std::size_t i = 1; i < tokens.size();)
+        // ★ パース処理の修正：単一フラグとキー・値ペアを正しく識別する
+        for (std::size_t i = 1; i < tokens.size(); ++i)
         {
-            const auto &key = tokens[i];
+            if (tokens[i] == "ponder")
+            {
+                ponder = true;
+                continue; // ponder単体で1トークン消費
+            }
+
             if (i + 1 >= tokens.size())
                 break;
+
+            const auto &key = tokens[i];
             const auto &val = tokens[i + 1];
 
             if (key == "btime")
+            {
                 btime = std::stoi(val);
+                ++i;
+            }
             else if (key == "wtime")
+            {
                 wtime = std::stoi(val);
+                ++i;
+            }
             else if (key == "binc")
+            {
                 binc = std::stoi(val);
+                ++i;
+            }
             else if (key == "winc")
+            {
                 winc = std::stoi(val);
+                ++i;
+            }
             else if (key == "byoyomi")
+            {
                 byoyomi = std::stoi(val);
+                ++i;
+            }
             else if (key == "movetime")
+            {
                 movetime = std::stoi(val);
-
-            i += 2;
+                ++i;
+            }
         }
 
         ensureState(ctx);
@@ -313,29 +351,51 @@ namespace
         }
         else
         {
-            int divisor = (PLY < 30) ? 20 : 15;
+            // 1. 通信遅延やエンジンの処理遅延を吸収するためのマージン (ms)
+            // 持ち時間が0になって時間切れ負けするのを防ぎます。
+            const int NETWORK_OVERHEAD = 50; 
+            
+            // 実際に使える安全な残り時間 (0未満にならないよう保護)
+            int usable_time = std::max(0, my_time - NETWORK_OVERHEAD);
 
-            // 基本の計算
-            think_time = (my_time / divisor) + my_inc;
+            // 2. 想定残り手数 (Moves To Go) の算出
+            // 将棋の平均手数は110〜120手程度。現在のPLYからあと何手続くかを推測します。
+            int expected_moves_left;
+            if (PLY < 40) {
+                expected_moves_left = 35; // 序盤: まだ手数が続く
+            } else if (PLY < 80) {
+                expected_moves_left = 25; // 中盤: 激しくなりやすい
+            } else {
+                expected_moves_left = 15; // 終盤: 決着が近い
+            }
 
-            // 3. 序盤の最低思考時間を短めに、中盤以降を長めにする調整
-            // 序盤は 500ms、中盤以降は 2000ms を保証するなど
-            int min_think_time = (PLY < 30) ? 1000 : 2000;
+            // 3. 基本となる思考時間 (Base Time)
+            // 残り時間を想定手数で割り、フィッシャー加算の80%を加える。
+            // (加算を100%使わず少し貯金することで、難局で時間を使えるようにする)
+            int base_time = (usable_time / expected_moves_left) + (my_inc * 8 / 10);
+
+            // 4. 絶対に超えてはいけない上限 (Hard Limit)
+            // 1手に残り時間の20%以上を使うと、その後の時間切れリスクが激増するため制限。
+            int absolute_limit = (usable_time / 5) + my_inc; 
+
+            // まず、基本時間を上限でクリップする
+            think_time = std::min(base_time, absolute_limit);
+
+            // 5. 最低限の思考時間の確保 (Min Limit)
+            // どんなに早くても100msは考えて浅い探索による悪手を防ぐ
+            int min_think_time = 100;
             think_time = std::max(think_time, min_think_time);
 
-            // 4. 残り時間による絶対制限（時間切れ防止）
-            int absolute_limit = my_time * 0.85;
-            think_time = std::min(think_time, absolute_limit);
+            // 6. 【最終安全装置】実際に残っている安全な時間を絶対に超えない
+            think_time = std::min(think_time, usable_time);
         }
 
         sendInfoString("think_time(ms)=" + std::to_string(think_time));
 
         ensureNNUEWeightsLoaded(ctx);
 
-        // 二重起動防止: 既存探索があれば止めて待つ
         stopAndJoinSearchThreadIfAny();
 
-        // フラグ初期化
         engine::isStop.store(false, std::memory_order_relaxed);
         g_search.finished.store(false, std::memory_order_relaxed);
         g_search.bestmove_sent.store(false, std::memory_order_relaxed);
@@ -345,16 +405,17 @@ namespace
             g_search.bestmove = "resign";
         }
 
-        bool ponder = false;
-        for (const auto &t : tokens)
-        {
-            if (t == "ponder")
-            {
-                ponder = true;
-                break;
-            }
-        }
         g_search.pondering.store(ponder, std::memory_order_relaxed);
+        g_search.think_time = think_time;
+
+        if (ponder)
+        {
+            engine::limitTimeMs.store(std::numeric_limits<long long>::max(), std::memory_order_relaxed);
+        } else {
+            auto now = std::chrono::steady_clock::now().time_since_epoch();
+            long long start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+            engine::limitTimeMs.store(start_ms + think_time, std::memory_order_relaxed);
+        }
 
         ensureState(ctx);
         const std::string sfen_snapshot = nshogi::io::sfen::stateToSfen(ctx.state->getState());
@@ -363,6 +424,7 @@ namespace
         g_search.worker = std::thread([sfen_snapshot, weights_loaded, think_time]()
                                       {
             std::string best = "resign";
+            std::string ponder_move = "";
             int depth = 0;
             int score = 0;
 
@@ -375,6 +437,11 @@ namespace
                     best = nshogi::io::sfen::move32ToSfen(result.bestMove);
                     depth = result.depth;
                     score = result.score;
+
+                    if (!result.ponderMove.isNone())
+                    {
+                        ponder_move = nshogi::io::sfen::move32ToSfen(result.ponderMove);
+                    }
                 }
             }
             else
@@ -390,10 +457,10 @@ namespace
             {
                 std::lock_guard<std::mutex> lock(g_usi_io_mutex);
                 g_search.bestmove = best;
+                g_search.pondermove = ponder_move;
             }
             g_search.finished.store(true, std::memory_order_relaxed);
 
-            // ponder中は出力せず保持。通常goならここでbestmoveを出す(1回だけ)。
             if (!g_search.pondering.load(std::memory_order_relaxed))
             {
                 std::cout << "info depth " << depth << " score cp " << score << " pv " << best << std::endl;
@@ -421,9 +488,10 @@ int main()
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_10_13_hash");
+            writeLine("id name nebula_release");
             writeLine("id author Sasaki, Horiuchi");
             writeLine("option name USI_Hash type spin default 4096 min 16 max 131072");
+            writeLine("option name USI_Ponder type check default true");
             writeLine("usiok");
             continue;
         }
@@ -534,6 +602,13 @@ int main()
         if (cmd == "ponderhit")
         {
             g_search.pondering.store(false, std::memory_order_relaxed);
+
+            // 予想が命中したので、ここから本来の思考時間のタイマーを始動する
+            auto now = std::chrono::steady_clock::now().time_since_epoch();
+            long long start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+            engine::limitTimeMs.store(start_ms + g_search.think_time, std::memory_order_relaxed);
+
+            // もしponder中にすでに探索が完了していた場合は、即座に bestmove を返す
             tryPublishBestmove();
             continue;
         }

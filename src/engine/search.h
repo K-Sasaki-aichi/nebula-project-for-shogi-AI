@@ -38,6 +38,7 @@ namespace engine
     struct SearchResult
     {
         nshogi::core::Move32 bestMove = nshogi::core::Move32::MoveNone();
+        nshogi::core::Move32 ponderMove = nshogi::core::Move32::MoveNone();
         int32_t score = 0;
         int32_t depth = 0;
     };
@@ -210,9 +211,6 @@ namespace engine
     {
         td.nodes++;
 
-        // 途中で終了してもいいように
-        td.pvLength[ply] = 0;
-
         if (td.isMain && (td.nodes & 2047) == 0)
         {
             auto now = std::chrono::steady_clock::now().time_since_epoch();
@@ -256,6 +254,7 @@ namespace engine
 
         if (depth == 0)
         {
+            td.pvLength[ply] = 0;
             return qsearch<C>(st, 50, alpha, beta, ply, td);
         }
 
@@ -286,16 +285,34 @@ namespace engine
                 if(tt_score > 29000) tt_score -= ply;
                 else if(tt_score < -29000) tt_score += ply;
 
+                bool cutoff = false;
                 if (bound == BOUND_EXACT)
-                    return tt_score;
+                    cutoff = true;
 
                 if (bound == BOUND_LOWER && tt_score >= beta)
-                    return tt_score;
+                    cutoff = true;
 
                 if (bound == BOUND_UPPER && tt_score <= alpha)
+                    cutoff = true;
+
+                if(cutoff){
+                    // TTカットオフ時: tt_move が存在すれば PV にセットする
+                    if (!tt_move.isNone())
+                    {
+                        td.pvTable[ply][0] = tt_move;
+                        td.pvLength[ply] = 1;
+                    }
+                    else
+                    {
+                        td.pvLength[ply] = 0;
+                    }
                     return tt_score;
+                }
             }
         }
+
+        // 途中で終了してもいいように
+        td.pvLength[ply] = 0;
 
         // 1. NMPのための静的評価値チェック（TTにスコアがあればそれを使う実装に拡張も可能）
         int16_t static_eval = st.eval<C>();

@@ -124,13 +124,15 @@ namespace engine
         using nshogi::core::Black;
         using nshogi::core::White;
 
-        auto now = std::chrono::steady_clock::now().time_since_epoch();
-        long long start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-        limitTimeMs.store(start_ms + think_time, std::memory_order_relaxed);
+        // if (limitTimeMs.load(std::memory_order_relaxed) != std::numeric_limits<long long>::max()){
+        //     auto now = std::chrono::steady_clock::now().time_since_epoch();
+        //     long long start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+        //     limitTimeMs.store(start_ms + think_time, std::memory_order_relaxed);
+        // }
 
         const int depth = 40;
         const int INF = 30000;
-        const int NUM_THREADS = 5;
+        const int NUM_THREADS = 4;
         std::vector<ThreadData> threadData(NUM_THREADS + 1);
         SearchResult result;
 
@@ -369,17 +371,26 @@ namespace engine
 
             print_pv(i + 1, result.score, main_td.nodes, main_td);
 
+            // 評価値の変動が 30cp 以内かつ手も安定している場合のみ打ち切る
+            bool score_is_stable = std::abs(result.score - prev_score) <= 150;
+
+            if (age < 55 && i >= 13 && stable_count >= 4 && score_is_stable)
+                break;
+
+            if (age >= 55 && i >= 15 && stable_count >= 5 && score_is_stable)
+                break;
+
             // 終了条件
-            if (prev_best_move == result.bestMove)
-                stable_count++;
-            else
-                stable_count = 0;
+            // if (prev_best_move == result.bestMove)
+            //     stable_count++;
+            // else
+            //     stable_count = 0;
 
-            if (age < 55 && i >= 11 && stable_count >= 3)
-                break;
+            // if (age < 55 && i >= 13 && stable_count >= 6)
+            //     break;
 
-            if(age >= 55 && i >= 13 && stable_count >= 4)
-                break;
+            // if(age >= 55 && i >= 15 && stable_count >= 8)
+            //     break;
             prev_best_move = result.bestMove;
             prev_score = result.score;
         }
@@ -424,6 +435,12 @@ namespace engine
         //     // 1ms未満の場合は測定不能として出すか、前回の値を出す
         //     std::cout << "nps:0 (too fast)" << std::endl;
         // }
+
+        // 探索終了直前にPVの2手目をponderMoveとして格納
+        if (main_td.pvLength[0] >= 2)
+        {
+            result.ponderMove = main_td.pvTable[0][1];
+        }
 
         return result;
     }
