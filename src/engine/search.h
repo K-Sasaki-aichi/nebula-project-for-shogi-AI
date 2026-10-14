@@ -94,7 +94,10 @@ namespace engine
 
     inline void print_pv(int depth, int score, uint64_t nodes, const ThreadData& td)
     {
-        std::cout << "info depth " << depth << " nodes " << nodes << " score cp " << score << " pv";
+        // ここでハッシュ使用率を取得（パーミル単位: 0〜1000）
+        int hashfull = TT.hashFull();
+
+        std::cout << "info depth " << depth << " nodes " << nodes << " hashfull " << hashfull << " score cp " << score << " pv";
         for (int j = 0; j < td.pvLength[0] && j < MaxPly; ++j)
         {
             std::cout << " " << nshogi::io::sfen::move32ToSfen(td.pvTable[0][j]);
@@ -234,9 +237,9 @@ namespace engine
         case nshogi::core::RepetitionStatus::Repetition:
             return 0; // 通常の千日手
         case nshogi::core::RepetitionStatus::SuperiorRepetition:
-            return INF - ply;
+            return 20000;
         case nshogi::core::RepetitionStatus::InferiorRepetition:
-            return -INF + ply;
+            return -20000;
         default:
             break;
         }

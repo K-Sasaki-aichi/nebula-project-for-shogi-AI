@@ -31,12 +31,12 @@ namespace engine
     public:
         TranspositionTable()
         {
-            resize(1024 * 4);
+            resize(1024 * 7);
         }
 
         void resize(size_t size_mb)
         {
-            size_t num_entries = (size_mb * 1024 * 1024) / sizeof(TTSlot);
+            size_t num_entries = (size_mb * 1024ULL * 1024ULL) / sizeof(TTSlot);
 
             size_t p2 = 1;
             while (p2 * 2 <= num_entries)
@@ -44,6 +44,24 @@ namespace engine
 
             table = std::make_unique<TTSlot[]>(p2);
             mask = p2 - 1;
+        }
+
+        int hashFull() const
+        {
+            size_t valid_entries = 0;
+            size_t total_entries = mask + 1;
+            
+            // 全数走査すると重いため、サンプリング（先頭から1000スロットなど）または全数チェック
+            // 高速化のため、一定の間隔でサンプリングして計算することも可能です
+            size_t sample_size = std::min(total_entries, size_t(1000));
+            for (size_t i = 0; i < sample_size; ++i)
+            {
+                if (table[i].key.load(std::memory_order_relaxed) != 0)
+                {
+                    valid_entries++;
+                }
+            }
+            return static_cast<int>((valid_entries * 1000) / sample_size);
         }
 
         // 多分使ってないのでコメントアウトしてもよいはず。
