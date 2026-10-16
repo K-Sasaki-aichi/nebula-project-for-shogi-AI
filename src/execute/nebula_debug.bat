@@ -1,2 +1,2 @@
 @echo off
-wsl cd /mnt/c/Users/ksasa/source/repos/shogi_ai/nebula/src ^; ./nebula_new.exe
+wsl cd .. ^; ./nebula_new.exe
