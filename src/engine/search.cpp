@@ -71,7 +71,7 @@ namespace engine
                         return;
 
                     st.doMove<Black>(mv);
-                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 0, td);
+                    int16_t score = -negamax<White>(st, i, -INF, -alpha, age, 1, td);
                     st.undoMove();
                     if (isStop.load(std::memory_order_relaxed))
                         return;
@@ -92,7 +92,7 @@ namespace engine
                         return;
 
                     st.doMove<White>(mv);
-                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 0, td);
+                    int16_t score = -negamax<Black>(st, i, -INF, -alpha, age, 1, td);
                     st.undoMove();
 
                     if (isStop.load(std::memory_order_relaxed))
@@ -195,7 +195,7 @@ namespace engine
 
             int16_t window_alpha = -INF;
             int16_t window_beta = INF;
-            int delta = 300;
+            int delta = 50;
 
             if (i >= 4) {
                 window_alpha = std::max(static_cast<int>(-INF), prev_score - delta);
@@ -372,14 +372,15 @@ namespace engine
             print_pv(i + 1, result.score, main_td.nodes, main_td);
 
             // 評価値の変動が 30cp 以内かつ手も安定している場合のみ打ち切る
-            bool score_is_stable = std::abs(result.score - prev_score) <= 150;
+            if (result.bestMove == prev_best_move) stable_count++; else stable_count = 0;
+            const bool score_is_stable = std::abs(result.score - prev_score) <= 30;
+            prev_best_move = result.bestMove;
+            prev_score = result.score;
 
-            if (age < 55 && i >= 13 && stable_count >= 4 && score_is_stable)
+            const int min_depth   = (age < 55) ? 13 : 15;
+            const int need_stable = (age < 55) ? 4 : 5;
+            if (i >= min_depth && stable_count >= need_stable && score_is_stable)
                 break;
-
-            if (age >= 55 && i >= 15 && stable_count >= 5 && score_is_stable)
-                break;
-
             // 終了条件
             // if (prev_best_move == result.bestMove)
             //     stable_count++;
