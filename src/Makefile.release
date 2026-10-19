@@ -20,7 +20,7 @@ CXXFLAGS += -fuse-ld=lld
 LDFLAGS ?= -L./$(NSHOGI_OBJDIR)/lib -lnshogi_static -pthread
 # -------------------------------------------------------------
 
-USI_TARGET ?= nebula_win_s.exe
+USI_TARGET ?= nebula_win_s_d50.exe
 
 # 先ほど成功した構成（engine/main.cpp は不要）
 USI_SRCS := \

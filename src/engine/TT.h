@@ -64,6 +64,21 @@ namespace engine
             return static_cast<int>((valid_entries * 1000) / sample_size);
         }
 
+        void clear()
+        {
+            const size_t total_entries = mask + 1;
+            for (size_t i = 0; i < total_entries; ++i)
+            {
+                table[i].key.store(0, std::memory_order_relaxed);
+                table[i].move.store(0, std::memory_order_relaxed);
+                table[i].score.store(0, std::memory_order_relaxed);
+                table[i].eval.store(0, std::memory_order_relaxed);
+                table[i].depth.store(0, std::memory_order_relaxed);
+                table[i].age.store(0, std::memory_order_relaxed);
+                table[i].bound.store(BOUND_NONE, std::memory_order_relaxed);
+            }
+        }
+
         // 多分使ってないのでコメントアウトしてもよいはず。
         //ダメだったら教えてください。
         // inline TTEntry *probe(uint64_t hash)

@@ -217,9 +217,8 @@ namespace
     void applyMoveTokens(EngineContext &ctx, const std::vector<std::string> &tokens, std::size_t fromIndex)
     {
         ensureState(ctx);
-        //PLY = tokens.size();
-        ctx.state->doMove(mv);
-        ++PLY;   
+        PLY = tokens.size();
+  
         for (std::size_t i = fromIndex; i < tokens.size(); ++i)
         {
             // sfenToMove32はPositionを要求するため、getPosition()を渡す
@@ -240,50 +239,29 @@ namespace
             return;
         }
 
-        // std::size_t i = 1;
-        // if (tokens[i] == "startpos")
-        // {
-        //     ctx.state.emplace(); // StatewithNNUE() 初期化（フル計算）
-        //     ++i;
-        // }
-        // else if (tokens[i] == "sfen")
-        // {
-        //     if (i + 4 >= tokens.size())
-        //     {
-        //         throw std::runtime_error("position sfen: insufficient tokens");
-        //     }
-        //     const std::string sfen = tokens[i + 1] + " " + tokens[i + 2] + " " + tokens[i + 3] + " " + tokens[i + 4];
-
-        //     // nshogi::core::State を生成し、StatewithNNUE(nshogi::core::State&&) コンストラクタにムーブして渡す
-        //     ctx.state.emplace(nshogi::io::sfen::StateBuilder::newState(sfen));
-        //     i += 5;
-        // }
-        // else
-        // {
-        //     return;
-        // }
-
-        // if (i < tokens.size() && tokens[i] == "moves")
-        // {
-        //     ++i;
-        //     applyMoveTokens(ctx, tokens, i);
-        // }
-
-        int base_ply = 0;
+        std::size_t i = 1;
         if (tokens[i] == "startpos")
         {
-            ctx.state.emplace();
+            ctx.state.emplace(); // StatewithNNUE() 初期化（フル計算）
             ++i;
         }
         else if (tokens[i] == "sfen")
         {
-            ...
-            base_ply = std::max(0, std::stoi(tokens[i + 4]) - 1);   // sfen 末尾の手数
+            if (i + 4 >= tokens.size())
+            {
+                throw std::runtime_error("position sfen: insufficient tokens");
+            }
+            const std::string sfen = tokens[i + 1] + " " + tokens[i + 2] + " " + tokens[i + 3] + " " + tokens[i + 4];
+
+            // nshogi::core::State を生成し、StatewithNNUE(nshogi::core::State&&) コンストラクタにムーブして渡す
+            ctx.state.emplace(nshogi::io::sfen::StateBuilder::newState(sfen));
             i += 5;
         }
-        else return;
+        else
+        {
+            return;
+        }
 
-        PLY = base_ply;   // moves の前に設定
         if (i < tokens.size() && tokens[i] == "moves") { ++i; applyMoveTokens(ctx, tokens, i); }
     }
 
@@ -508,7 +486,7 @@ int main()
 
         if (cmd == "usi")
         {
-            writeLine("id name nebula_win_s");
+            writeLine("id name nebula_win_s_d50");
             writeLine("id author Sasaki, Horiuchi");
             writeLine("option name USI_Hash type spin default 4096 min 16 max 131072");
             writeLine("option name USI_Ponder type check default true");
